@@ -28,7 +28,11 @@ Ignacio Navarro <in714@ic.ac.uk>
 
 1.
 
-2.
+2. A call to 'strcpy()' can overflow the buffer reserved for its output string. 
+In other words, the function doesn't know the length of the destination string,
+so that if the string to be copied is longer than the reserved memory for 
+the destination string, the string will be copied corrupting other memory 
+(leading to crashes and potentially  become an exploitable system).
 
 3.
 
@@ -36,9 +40,19 @@ Ignacio Navarro <in714@ic.ac.uk>
 
 5.
 
-6.
+6. In Pintos we would first include the stdint.h header file, create the uint64_t
+int and then we would just 'printf()' the int with '%u', an unsigned decimal integer:
+  uint64_t x = 0x7700000;
+  printf(%u, x);
 
-7.
+7. Esentially a lock is a subset of a semaphore where the initial value is set to 1. 
+So then regarding functions, a lock has a 'lock_release()' equivalent to a 
+semaphore's 'sema_up()', a 'lock_try_acquire()' equivalent to a 
+semaphore's 'sema_try_down()' and a 'acquire()' equivalent to a semaphore's
+'sema_down()'. Regarding data structures, a semaphore struct has a list of waiting threads, 
+while a lock struct has a semaphore struct that itself has a list of waiting threads.
+The extra property that locks have that semaphores do not is that only the thread that
+acquires a lock, called the lock's "owner", is allowed to release it. 
 
 8.
 
