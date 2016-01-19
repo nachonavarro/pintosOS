@@ -26,17 +26,19 @@ Ignacio Navarro <in714@ic.ac.uk>
                PRELIMINARY QUESTIONS
                =====================
 
-1.
+1. The Git command that should be run to retrieve a copy of our group's shared Pintos repository in our local directory is 'git clone https://gitlab.doc.ic.ac.uk/lab1516_spring/pintos_18.git'.  At least one of our members, however, has set up SSH keys and host aliases, and would use the shorter 'git clone gitlab:lab1516_spring/pintos_18.git'.
 
-2.
+2. A call to 'strcpy()' can overflow the buffer reserved for its output string. 
+In other words, the function doesn't know the length of the destination string,
+so that if the string to be copied is longer than the reserved memory for 
+the destination string, the string will be copied corrupting other memory 
+(leading to crashes and potentially become an exploitable system).
 
-3.
+3. The default length of a scheduler time slice in Pintos is 4 ticks, which is equivalent to 0.04 seconds, as the timer ticks 100 times per second.
 
 4.
 
-5.
-
-Reproducibility refers to the capacity of a phenomenon, particularly
+5. Reproducibility refers to the capacity of a phenomenon, particularly
 an experimental result, to be replicated.  In a programming context,
 this is of particular importance in testing: if a program does not
 behave consistently, no test result can be relied upon, because even
@@ -47,13 +49,24 @@ makes debugging particularly difficult as the debugging process must
 be run repeatedly until the behaviour to be studied actually occurs -
 something which might never happen.
 
-6.
+6. In Pintos we would first include the '<stdint.h>' and the '<inttypes.h>' header file.
+The first header would let us create the uint64_t int and then with the second header
+we would 'printf()' the int with the macros PRIu64:
+  uint64_t x = ...;
+  printf("value=%"PRIu64"\n", x);
 
-7.
+7. Essentially a lock is a subset of a semaphore where the initial value is set to 1. 
+So then regarding functions, a lock has a 'lock_release()' equivalent to a 
+semaphore's 'sema_up()', a 'lock_try_acquire()' equivalent to a 
+semaphore's 'sema_try_down()' and a 'acquire()' equivalent to a semaphore's
+'sema_down()'. 
+Regarding data structures, a semaphore struct has a list of waiting threads, 
+while a lock struct has a semaphore struct that itself has a list of waiting threads.
+The extra property that locks have that semaphores do not is that only the thread that acquires a lock, called the lock's "owner", is allowed to release it. 
 
 8.
 
-9.
+9. If the test 'src/tests/devices/alarm-multiple' fails, we would find its output log in the file 'src/tests/devices/alarm-multiple.output' and its result log in the file 'src/tests/devices/alarm-multiple.result'.
 
 
                  DESIGN QUESTIONS
