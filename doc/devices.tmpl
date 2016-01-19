@@ -40,10 +40,11 @@ the destination string, the string will be copied corrupting other memory
 
 5.
 
-6. In Pintos we would first include the stdint.h header file, create the uint64_t
-int and then we would just 'printf()' the int with '%u', an unsigned decimal integer:
-  uint64_t x = 0x7700000;
-  printf(%u, x);
+6. In Pintos we would first include the '<stdint.h>' and the '<inttypes.h>' header file.
+The first header would let us create the uint64_t int and then with the second header
+we would 'printf()' the int with the macros PRIu64:
+  uint64_t x = ...;
+  printf("value=%"PRIu64"\n", x);
 
 7. Esentially a lock is a subset of a semaphore where the initial value is set to 1. 
 So then regarding functions, a lock has a 'lock_release()' equivalent to a 
