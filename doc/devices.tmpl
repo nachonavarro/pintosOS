@@ -64,7 +64,17 @@ Regarding data structures, a semaphore struct has a list of waiting threads,
 while a lock struct has a semaphore struct that itself has a list of waiting threads.
 The extra property that locks have that semaphores do not is that only the thread that acquires a lock, called the lock's "owner", is allowed to release it. 
 
-8.
+8. The sum of the sizes of a struct thread and the associated thread's
+execution stack is limited to a single page of memory, 4KiB in size.
+Because the kernel stack grows downward from the end of the page, and
+the struct thread is located at the beginning, if the stack grows too
+large it will corrupt the thread state struct.  This overflow is
+detected by examining the final member of the struct, ordinarily set
+to the value THREAD_MAGIC.  If it is not, the stack must have
+overflowed and rewritten it.  While it is in principle possible for
+the overflowing value to be equal to THREAD_MAGIC, Pintos does not
+handle this (unlikely) case.
+
 
 9. If the test 'src/tests/devices/alarm-multiple' fails, we would find its output log in the file 'src/tests/devices/alarm-multiple.output' and its result log in the file 'src/tests/devices/alarm-multiple.result'.
 
