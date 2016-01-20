@@ -36,7 +36,7 @@ the destination string, the string will be copied corrupting other memory
 
 3. The default length of a scheduler time slice in Pintos is 4 ticks, which is equivalent to 0.04 seconds, as the timer ticks 100 times per second.
 
-4. thread_create(function, priority, argument) creates a new context to be scheduled, passing the function to be run in the context. When the function 
+4. thread_create(name, priority, function, argument) creates a new context to be scheduled, passing the function to be run in the context. When the function
 returns, the thread terminates. Just before schedule() is called, the current running thread state must be changed from ‘THREAD RUNNING’, and interrupts
 must be disabled. Interrupts will be re-enabled by the next thread to be scheduled. Context switching begins when the schedule() called. From here, 
 running_thread() will be called to store a pointer the current running thread in the variable cur, and next_thread_to_run() will be called to store a 
