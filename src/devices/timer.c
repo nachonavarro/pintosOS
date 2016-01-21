@@ -29,6 +29,10 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
+//ADDED - This list will hold all threads that are waiting due to
+//        timer_sleep(), maybe change to use the semaphore waiters
+//        list by changing the way it chooses which waiter to wake up
+struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -84,11 +88,27 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+bool less_than(const struct list_elem *a, const struct list_elem *b,
+            void *aux UNUSED) {
+
+  struct thread* thread_to_insert = list_entry(a, struct thread, elem);
+  int64_t ticks_to_insert =  thread_to_insert->ticks_to_wake_on;
+  struct thread* thread_in_list = list_entry(b, struct thread, elem);
+  int64_t ticks_in_list =  thread_in_list->ticks_to_wake_on;
+
+  return ticks_to_insert < ticks_in_list;
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
+
+  if (ticks <= 0) {
+      return;
+  }
+
   //int64_t start = timer_ticks ();           //ADDED - This code is redundant now, using line below instead
   int64_t ticks_to_wake_on = ticks + timer_ticks();
 
@@ -96,10 +116,17 @@ timer_sleep (int64_t ticks)
   //while (timer_elapsed (start) < ticks)     //ADDED - This code is redundant now
   //  thread_yield ();
 
-  struct thread* cur = running_thread();      //ADDED - Find current thread, set its time to wake and do sema_down() (Make it wait for a sema_up())
-  cur->ticks_to_wake_on = ticks_to_wake_on;
-  (cur->timer_wait_sema).sema_down();
+  struct thread* cur = thread_current();      //ADDED - Find current thread, set its time to wake and do sema_down() (Make it wait for a sema_up())
+  enum intr_level intr_old_level = intr_disable();
+  cur->ticks_to_wake_on = ticks_to_wake_on;   //        Set its time to wake up at
+  list_insert_ordered(&timer_waiting_threads, &cur->elem, less_than, ticks_to_wake_on);//Put it in list of waiting threads
+  intr_set_level(intr_old_level);
 
+  printf("Hello");
+
+  sema_down(&cur->timer_wait_sema);           //        And do sema_down, so it waits for a sema_up
+
+  printf("World");
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -179,8 +206,28 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
-  //ADDED - TODO: Put stuff to wake thread by doing sema_up() here??? (Or possibly in thread_tick() - don't think it
-  //        TODO: matters, although abstraction would be bad), need to check if right amount of ticks have passed
+  //ADDED - Iterate through the list of waiting threads, and if enough tikcs
+  //        have passed to wake up one of the thread, it will be woken using
+  //        sema_up() and then it is removed from the waiting threads list
+
+  //If two threads are scheduled to wake up at the same time, the thread at the
+  //front of the list will be woken up first, then the next thread will be
+  //immediately woken up - Threads are added using list_push_back.
+  //TODO: Is this the best way to do it? Should we
+  //only wake one thread? Or switch the order of waking?
+
+  //TODO: Can we change this to an enhanced for loop
+
+  enum intr_level intr_old_level = intr_disable();
+  if (!list_empty(&timer_waiting_threads)) {
+      struct list_elem* waiting_thread_head_elem = list_begin(&timer_waiting_threads);
+      struct thread* waiting_thread_head = list_entry(waiting_thread_head_elem, struct thread, elem);
+      if (waiting_thread_head->ticks_to_wake_on <= timer_ticks()) {
+        list_remove(waiting_thread_head_elem);
+        sema_up(&waiting_thread_head->timer_wait_sema);
+      }
+  }
+  intr_set_level(intr_old_level);
 
 }
 /* Returns true if LOOPS iterations waits for more than one timer
