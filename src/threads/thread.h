@@ -93,6 +93,11 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    struct semaphore timer_wait_sema;  //ADDED - The semaphore to make the thread wait - used only by timer (For now??)
+                                       //        Eliminates the need to thread_block(), which is good!
+
+    int64_t ticks_to_wake_on;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

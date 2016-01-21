@@ -89,11 +89,17 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  //int64_t start = timer_ticks ();           //ADDED - This code is redundant now, using line below instead
+  int64_t ticks_to_wake_on = ticks + timer_ticks();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  //while (timer_elapsed (start) < ticks)     //ADDED - This code is redundant now
+  //  thread_yield ();
+
+  struct thread* cur = running_thread();      //ADDED - Find current thread, set its time to wake and do sema_down() (Make it wait for a sema_up())
+  cur->ticks_to_wake_on = ticks_to_wake_on;
+  (cur->timer_wait_sema).sema_down();
+
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,8 +178,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-}
 
+  //ADDED - TODO: Put stuff to wake thread by doing sema_up() here??? (Or possibly in thread_tick() - don't think it
+  //        TODO: matters, although abstraction would be bad), need to check if right amount of ticks have passed
+
+}
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool
