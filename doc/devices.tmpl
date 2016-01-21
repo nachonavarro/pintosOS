@@ -26,7 +26,10 @@ Ignacio Navarro <in714@ic.ac.uk>
                PRELIMINARY QUESTIONS
                =====================
 
-1. The Git command that should be run to retrieve a copy of our group's shared Pintos repository in our local directory is 'git clone https://gitlab.doc.ic.ac.uk/lab1516_spring/pintos_18.git'.  At least one of our members, however, has set up SSH keys and host aliases, and would use the shorter 'git clone gitlab:lab1516_spring/pintos_18.git'.
+1. The Git command that should be run to retrieve a copy of our group's shared 
+Pintos repository in our local directory is 'git clone https://gitlab.doc.ic.ac.uk/lab1516_spring/pintos_18.git'.
+At least one of our members, however, has set up SSH keys and host aliases,
+and would use the shorter 'git clone gitlab:lab1516_spring/pintos_18.git'.
 
 2. A call to 'strcpy()' can overflow the buffer reserved for its output string. 
 In other words, the function doesn't know the length of the destination string,
@@ -34,21 +37,29 @@ so that if the string to be copied is longer than the reserved memory for
 the destination string, the string will be copied corrupting other memory 
 (leading to crashes and potentially become an exploitable system).
 
-3. The default length of a scheduler time slice in Pintos is 4 ticks, which is equivalent to 0.04 seconds, as the timer ticks 100 times per second.
+3. The default length of a scheduler time slice in Pintos is 4 ticks, 
+which is equivalent to 0.04 seconds, as the timer ticks 100 times per second.
 
-4. thread_create(name, priority, function, argument) creates a new context to be scheduled, passing the function to be run in the context. When the function
-returns, the thread terminates. Just before schedule() is called, the current running thread state must be changed from ‘THREAD RUNNING’, and interrupts
-must be disabled. Interrupts will be re-enabled by the next thread to be scheduled. Context switching begins when the schedule() called. From here, 
-running_thread() will be called to store a pointer the current running thread in the variable cur, and next_thread_to_run() will be called to store a 
-pointer to the next thread to be run in the variable next. Before any switching occurs, schedule() asserts that interrupts are disabled by calling 
-intr_get_level(), and is_thread(next) is called to assert that next is indeed pointing to a valid thread. Now, if the pointers obtained earlier aren’t 
-pointing to the same thread (i.e. the next thread to be run is not the thread that is already running), switch_threads(cur, next) is called. When a 
-thread calls switch_threads(), another thread starts running, and the new thread returns from switch_threads(), returning the previously running thread. 
-switch_threads() will save registers on the stack, save the CPU current stack pointer in the current struct thread’s stack member and restore registers 
-from the stack. The pointer returned from switch_threads() is stored in the variable prev. Finally, thread_schedule_tail(prev) is called to do the rest 
-of the scheduling. This function will change the state of the new thread to ‘THREAD_RUNNING’. Also, if the previous thread was dying, it will be 
-destroyed, and the page containing its struct thread and stack will be freed. thread_schedule_tail() is separate from schedule() because the first time 
-a thread is created using thread_create(), the new thread hasn’t started running yet, so it cannot be running inside switch_threads(), which is what 
+4. thread_create(name, priority, function, argument) creates a new context to be scheduled, 
+passing the function to be run in the context. When the function returns, the thread terminates. 
+Just before schedule() is called, the current running thread state must be changed from 
+‘THREAD RUNNING’, and interrupts must be disabled. Interrupts will be re-enabled by the next 
+thread to be scheduled. Context switching begins when the schedule() called. From here, 
+running_thread() will be called to store a pointer the current running thread in the variable cur, 
+and next_thread_to_run() will be called to store a pointer to the next thread to be run in the
+variable next. Before any switching occurs, schedule() asserts that interrupts are disabled by calling 
+intr_get_level(), and is_thread(next) is called to assert that next is indeed pointing to a valid thread. 
+Now, if the pointers obtained earlier aren’t pointing to the same thread (i.e. the next thread to be run 
+is not the thread that is already running), switch_threads(cur, next) is called. When a thread calls 
+switch_threads(), another thread starts running, and the new thread returns from switch_threads(), 
+returning the previously running thread. switch_threads() will save registers on the stack, save 
+the CPU current stack pointer in the current struct thread’s stack member and restore registers 
+from the stack. The pointer returned from switch_threads() is stored in the variable prev. Finally, 
+thread_schedule_tail(prev) is called to do the rest of the scheduling. This function will change the 
+state of the new thread to ‘THREAD_RUNNING’. Also, if the previous thread was dying, it will be 
+destroyed, and the page containing its struct thread and stack will be freed. thread_schedule_tail() 
+is separate from schedule() because the first time a thread is created using thread_create(), the 
+new thread hasn’t started running yet, so it cannot be running inside switch_threads(), which is what 
 schedule() expects, so thread_schedule_tail() is called directly when creating some fake stack frames. 
 
 5. Reproducibility refers to the capacity of a phenomenon, particularly
@@ -75,7 +86,8 @@ semaphore's 'sema_try_down()' and a 'acquire()' equivalent to a semaphore's
 'sema_down()'. 
 Regarding data structures, a semaphore struct has a list of waiting threads, 
 while a lock struct has a semaphore struct that itself has a list of waiting threads.
-The extra property that locks have that semaphores do not is that only the thread that acquires a lock, called the lock's "owner", is allowed to release it. 
+The extra property that locks have that semaphores do not is that only the thread that 
+acquires a lock, called the lock's "owner", is allowed to release it. 
 
 8. The sum of the sizes of a struct thread and the associated thread's
 execution stack is limited to a single page of memory, 4KiB in size.
@@ -88,7 +100,9 @@ overflowed and rewritten it.  While it is in principle possible for
 the overflowing value to be equal to THREAD_MAGIC, Pintos does not
 handle this (unlikely) case.
 
-9. If the test 'src/tests/devices/alarm-multiple' fails, we would find its output log in the file 'src/tests/devices/alarm-multiple.output' and its result log in the file 'src/tests/devices/alarm-multiple.result'.
+9. If the test 'src/tests/devices/alarm-multiple' fails, we would find its output 
+log in the file 'src/tests/devices/alarm-multiple.output' and its result log in the 
+file 'src/tests/devices/alarm-multiple.result'.
 
 
                  DESIGN QUESTIONS
