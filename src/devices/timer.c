@@ -91,9 +91,9 @@ timer_elapsed (int64_t then)
 bool less_than(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
 
-  struct thread* thread_to_insert = list_entry(a, struct thread, elem);
+  struct thread* thread_to_insert = list_entry(a, struct thread, sleep_elem);
   int64_t ticks_to_insert =  thread_to_insert->ticks_to_wake_on;
-  struct thread* thread_in_list = list_entry(b, struct thread, elem);
+  struct thread* thread_in_list = list_entry(b, struct thread, sleep_elem);
   int64_t ticks_in_list =  thread_in_list->ticks_to_wake_on;
 
   return ticks_to_insert < ticks_in_list;
@@ -109,24 +109,16 @@ timer_sleep (int64_t ticks)
       return;
   }
 
-  //int64_t start = timer_ticks ();           //ADDED - This code is redundant now, using line below instead
   int64_t ticks_to_wake_on = ticks + timer_ticks();
 
   ASSERT (intr_get_level () == INTR_ON);
-  //while (timer_elapsed (start) < ticks)     //ADDED - This code is redundant now
-  //  thread_yield ();
 
-  struct thread* cur = thread_current();      //ADDED - Find current thread, set its time to wake and do sema_down() (Make it wait for a sema_up())
-  enum intr_level intr_old_level = intr_disable();
-  cur->ticks_to_wake_on = ticks_to_wake_on;   //        Set its time to wake up at
-  list_insert_ordered(&timer_waiting_threads, &cur->elem, less_than, ticks_to_wake_on);//Put it in list of waiting threads
-  intr_set_level(intr_old_level);
+  //ADDED - Find current thread, set its time to wake and do sema_down() (Make it wait for a sema_up())
+  struct thread* cur = thread_current();
+  cur->ticks_to_wake_on = ticks_to_wake_on;
+  list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_than, ticks_to_wake_on);
+  sema_down(&cur->timer_wait_sema);
 
-  printf("Hello");
-
-  sema_down(&cur->timer_wait_sema);           //        And do sema_down, so it waits for a sema_up
-
-  printf("World");
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -219,14 +211,20 @@ timer_interrupt (struct intr_frame *args UNUSED)
   //TODO: Can we change this to an enhanced for loop
 
   enum intr_level intr_old_level = intr_disable();
-  if (!list_empty(&timer_waiting_threads)) {
-      struct list_elem* waiting_thread_head_elem = list_begin(&timer_waiting_threads);
-      struct thread* waiting_thread_head = list_entry(waiting_thread_head_elem, struct thread, elem);
-      if (waiting_thread_head->ticks_to_wake_on <= timer_ticks()) {
-        list_remove(waiting_thread_head_elem);
-        sema_up(&waiting_thread_head->timer_wait_sema);
-      }
+
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&timer_waiting_threads);
+		  e != list_end (&timer_waiting_threads); e = list_next (e)) {
+        struct thread *waiting_thread = list_entry (e, struct thread, sleep_elem);
+        if (waiting_thread->ticks_to_wake_on <= timer_ticks()) {
+        	list_remove(e);
+            sema_up(&waiting_thread->timer_wait_sema);
+        }
   }
+
   intr_set_level(intr_old_level);
 
 }
