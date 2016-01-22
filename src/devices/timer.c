@@ -88,7 +88,9 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-bool less_than(const struct list_elem *a, const struct list_elem *b,
+/* Returns true if ticks_to_wake_on of thread a is less than ticks_to_wake_on
+   of thread b. */
+bool less_wake(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
 
   struct thread* thread_to_insert = list_entry(a, struct thread, sleep_elem);
@@ -105,18 +107,32 @@ void
 timer_sleep (int64_t ticks) 
 {
 
+  /* Cannot sleep for 0 or less ticks (This wouldn't make sense). */
   if (ticks <= 0) {
       return;
   }
 
+  /* When ticks_to_wake_on ticks have passed (Since the OS booted), this
+     thread can be woken. */
   int64_t ticks_to_wake_on = ticks + timer_ticks();
 
   ASSERT (intr_get_level () == INTR_ON);
 
-  //ADDED - Find current thread, set its time to wake and do sema_down() (Make it wait for a sema_up())
+  /* Find current thread (The one that will be sleeping) and
+  set its ticks_to_wake_on member. */
   struct thread* cur = thread_current();
   cur->ticks_to_wake_on = ticks_to_wake_on;
-  list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_than, ticks_to_wake_on);
+  /* Insert the thread into a list of sleeping threads. This list is ordered,
+     so the thread that should wake up first goes at the head of the list.
+     If a thread that is due to wake up at the same time as a currently
+     sleeping thread is added to the list, it will be inserted after the
+     other thread. */
+  list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_wake, ticks_to_wake_on);
+  /* sema_down is called on this threads timer_wait_sema member. This causes
+     the thread to wait until sema_up is called in timer_interrupt when the
+     thread is due to wake up, according to its ticks_to_wake_on member.
+     If a timer interrupt happens here, there would not be a problem
+     (Explained in timer_interrupt function). */
   sema_down(&cur->timer_wait_sema);
 
 }
@@ -198,31 +214,31 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
-  //ADDED - Iterate through the list of waiting threads, and if enough tikcs
-  //        have passed to wake up one of the thread, it will be woken using
-  //        sema_up() and then it is removed from the waiting threads list
-
-  //If two threads are scheduled to wake up at the same time, the thread at the
-  //front of the list will be woken up first, then the next thread will be
-  //immediately woken up - Threads are added using list_push_back.
-  //TODO: Is this the best way to do it? Should we
-  //only wake one thread? Or switch the order of waking?
-
-  //TODO: Can we change this to an enhanced for loop
-
   enum intr_level intr_old_level = intr_disable();
 
   struct list_elem *e;
 
-  ASSERT (intr_get_level () == INTR_OFF);
-
+  /* Traverse the list from the beginning of the list. */
   for (e = list_begin (&timer_waiting_threads);
 		  e != list_end (&timer_waiting_threads); e = list_next (e)) {
-        struct thread *waiting_thread = list_entry (e, struct thread, sleep_elem);
-        if (waiting_thread->ticks_to_wake_on <= timer_ticks()) {
-        	list_remove(e);
-            sema_up(&waiting_thread->timer_wait_sema);
-        }
+
+      struct thread *waiting_thread =
+        list_entry (e, struct thread, sleep_elem);
+      /* Since the list is ordered, if we find a thread that isn't due to wake
+         up, we can stop looking at threads further on in the list. */
+      if (waiting_thread->ticks_to_wake_on > timer_ticks()) {
+          break;
+      }
+      /* Removes the thread that is due to wake up (Traversal of list would
+         have stopped if this thread was not due to wake up). */
+      list_remove(e);
+      /* Wakes up the sleeping thread. Doesn't matter if this is called before
+         sema_down (But after the thread has been added to the waiting list,
+         otherwise sema_up would not be called), as if this was the case,
+         sema_down would just not wait, which is fine as the fact that sema_up
+         was called means that the thread is due to be woken. */
+      sema_up(&waiting_thread->timer_wait_sema);
+
   }
 
   intr_set_level(intr_old_level);
