@@ -1,0 +1,162 @@
+\documentclass{article}
+
+\usepackage{fancyhdr} % Required for custom headers
+\usepackage{lastpage} % Required to determine the last page for the footer
+\usepackage{extramarks} % Required for headers and footers
+\usepackage[usenames,dvipsnames]{color} % Required for custom colors
+\usepackage{graphicx} % Required to insert images
+\usepackage{listings} % Required for insertion of code
+\usepackage{courier} % Required for the courier font
+
+% Margins
+\topmargin=-0.45in
+\evensidemargin=0in
+\oddsidemargin=0in
+\textwidth=6.5in
+\textheight=9.0in
+\headsep=0.25in
+
+\linespread{1.1} % Line spacing
+
+% Set up the header and footer
+\pagestyle{fancy}
+\lhead{Group 18} % Top left header
+\chead{Task 0: Alarm Clock} % Top center head
+\rhead{\firstxmark} % Top right header
+\lfoot{\lastxmark} % Bottom left footer
+\rfoot{Page\ \thepage\ of\ \protect\pageref{LastPage}} % Bottom right footer
+\renewcommand\headrulewidth{0.4pt} % Size of the header rule
+\renewcommand\footrulewidth{0.4pt} % Size of the footer rule
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title{
+\vspace{2in}
+\textmd{\textbf{Task 0: Alarm Clock}}\\
+\normalsize\vspace{0.1in}\small{Due\ on\ Tuesday,\ January\ 26,\ 2016}\\
+\vspace{0.1in}\large{\textbf{Pintos Group 18}}
+\vspace{3in}
+}
+
+\author{Corentin Herbinet, Ignacio Navarro, Vinothan Shankar, William Springsteen}
+\date{}
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+
+\section{Preliminary Questions}
+\subsection{Git}
+The Git command that should be run to retrieve a copy of our group's shared 
+Pintos repository in our local directory is git clone \texttt{https://gitlab.doc.ic.ac.uk/lab1516\char`_spring/pintos\char`_18.git}.
+At least one of our members, however, has set up SSH keys and host aliases,
+and would use the shorter \texttt{git clone gitlab:lab1516\char`_spring/pintos\char`_18.git}.
+
+\subsection{strcpy()}
+A call to 'strcpy()' can overflow the buffer reserved for its output string. 
+In other words, the function doesn't know the length of the destination string,
+so that if the string to be copied is longer than the reserved memory for 
+the destination string, the string will be copied corrupting other memory 
+(leading to crashes and potentially become an exploitable system).
+
+
+\subsection{Time slice and ticks}
+The default length of a scheduler time slice in Pintos is 4 ticks, 
+which is equivalent to 0.04 seconds, as the timer ticks 100 times per second.
+
+\subsection{Thread system}
+The function \texttt{thread\char`_create(name, priority, function, argument)} creates a new context to be scheduled, 
+passing the function to be run in the context. When the function returns, the thread terminates. 
+Just before \texttt{schedule()} is called, the current running thread state must be changed from 
+\texttt{THREAD RUNNING}, and interrupts must be disabled. Interrupts will be re-enabled by the next 
+thread to be scheduled. Context switching begins when the \texttt{schedule()} called. From here, 
+running \texttt{\char`_thread()} will be called to store a pointer the current running thread in the variable cur, 
+and next \texttt{next\char`_thread\char`_to\char`_run()} will be called to store a pointer to the next thread to be run in the
+variable next. Before any switching occurs, \texttt{schedule()} asserts that interrupts are disabled by calling 
+\texttt{intr\char`_get\char`_level()}, and \texttt{is\char`_thread(next)} is called to assert that next is indeed pointing to a valid thread. 
+Now, if the pointers obtained earlier aren’t pointing to the same thread (i.e. the next thread to be run 
+is not the thread that is already running), \texttt{switch\char`_threads(cur, next)} is called. When a thread calls 
+\texttt{switch\char`_threads()}, another thread starts running, and the new thread returns from \texttt{switch\char`_threads()}, 
+returning the previously running thread. \texttt{switch\char`_threads()} will save registers on the stack, save 
+the CPU current stack pointer in the current struct thread’s stack member and restore registers 
+from the stack. The pointer returned from \texttt{switch\char`_threads()} is stored in the variable prev. Finally, 
+\texttt{thread\char`_schedule\char`_tail(prev)} is called to do the rest of the scheduling. This function will change the 
+state of the new thread to \texttt{THREAD\char`_RUNNING}. Also, if the previous thread was dying, it will be 
+destroyed, and the page containing its struct thread and stack will be freed. \texttt{thread\char`_schedule\char`_tail()}
+is separate from \texttt{schedule()} because the first time a thread is created using \texttt{thread\char`_create()}, the 
+new thread hasn’t started running yet, so it cannot be running inside \texttt{switch\char`_threads()}, which is what 
+\texttt{schedule()} expects, so \texttt{thread\char`_schedule\char`_tail()} is called directly when creating some fake stack frames. 
+
+\subsection{Lack of reproducibility}
+Reproducibility refers to the capacity of a phenomenon, particularly
+an experimental result, to be replicated.  In a programming context,
+this is of particular importance in testing: if a program does not
+behave consistently, no test result can be relied upon, because even
+if it passes once it might fail on the next invocation.  For behaviour
+to be reproducible it must be clear what determines it (which, of
+course, requires that it be deterministic).  Lack of reproducibility
+makes debugging particularly difficult as the debugging process must
+be run repeatedly until the behaviour to be studied actually occurs -
+something which might never happen.
+
+\subsection{Printing unsigned integers}
+In Pintos we would first include the \texttt{<stdint.h>} and the \texttt{<inttypes.h>} header file.
+The first header would let us create the \texttt{uint64\char`_t int} and then with the second header
+we would \texttt{printf()} the \texttt{int} with the macros \texttt{PRIu64}: \newline
+  \texttt{uint64\char`_t x = ...;} \newline
+  \texttt{printf("value=\%"PRIu64"", x);}
+
+\subsection{Semaphores and locks}
+Essentially a lock is a subset of a semaphore where the initial value is set to 1. 
+So then regarding functions, a lock has a \texttt{lock\char`_release()} equivalent to a 
+semaphore's \texttt{sema\char`_up()}, a \texttt{lock\char`_try\char`_acquire()} equivalent to a 
+semaphore's \texttt{sema\char`_try\char`_down()} and a \texttt{lock\char`_acquire()} equivalent to a semaphore's
+\texttt{sema\char`_down()}. 
+Regarding data structures, a semaphore struct has a list of waiting threads, 
+while a lock struct has a semaphore struct that itself has a list of waiting threads.
+The extra property that locks have that semaphores do not is that only the thread that 
+acquires a lock, called the lock's owner, is allowed to release it. 
+
+\subsection{Thread's size and limitations}
+The sum of the sizes of a struct thread and the associated thread's
+execution stack is limited to a single page of memory, 4KiB in size.
+Because the kernel stack grows downward from the end of the page, and
+the struct thread is located at the beginning, if the stack grows too
+large it will corrupt the thread state struct.  This overflow is
+detected by examining the final member of the struct, ordinarily set
+to the value \texttt{THREAD\char`_MAGIC}.  If it is not, the stack must have
+overflowed and rewritten it.  While it is in principle possible for
+the overflowing value to be equal to \texttt{THREAD\char`_MAGIC}, Pintos does not
+handle this (unlikely) case.
+
+\subsection{Output of test's failures}
+If the test \texttt{src/tests/devices/alarm-multiple} fails, we would find its output 
+log in the file \newline \texttt{src/tests/devices/alarm-multiple.output} and its result log in the 
+file \newline \texttt{src/tests/devices/alarm-multiple.result}.
+
+\section{Design Questions}
+\subsection{Data Structures}
+\subsubsection{Purpose of new variables}
+\subsection{Algorithms}
+\subsubsection{Call to timer\_sleep()}
+\subsubsection{Minimizing time spent in timer\_interrupt()}
+\subsection{Synchronization}
+\subsubsection{Avoiding race conditions when multiple threads call timer\_sleep()}
+\subsubsection{Avoiding race conditions when timer\_interrupt() is called within timer\_sleep()}
+\subsection{Rationale}
+\subsubsection{Choice of design}
+
+
+
+%----------------------------------------------------------------------------------------
+
+\end{document}
