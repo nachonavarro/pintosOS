@@ -7,6 +7,7 @@
 \usepackage{graphicx} % Required to insert images
 \usepackage{listings} % Required for insertion of code
 \usepackage{courier} % Required for the courier font
+\renewcommand{\_}{\char`_}
 
 % Margins
 \topmargin=-0.45in
@@ -17,6 +18,15 @@
 \headsep=0.25in
 
 \linespread{1.1} % Line spacing
+
+\lstset{language=C,
+                basicstyle=\ttfamily,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{Plum}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#}
+}
+
 
 % Set up the header and footer
 \pagestyle{fancy}
@@ -62,7 +72,7 @@ At least one of our members, however, has set up SSH keys and host aliases,
 and would use the shorter \texttt{git clone gitlab:lab1516\char`_spring/pintos\char`_18.git}.
 
 \subsection{strcpy()}
-A call to 'strcpy()' can overflow the buffer reserved for its output string. 
+A call to \texttt{strcpy()} can overflow the buffer reserved for its output string. 
 In other words, the function doesn't know the length of the destination string,
 so that if the string to be copied is longer than the reserved memory for 
 the destination string, the string will be copied corrupting other memory 
@@ -142,10 +152,62 @@ handle this (unlikely) case.
 If the test \texttt{src/tests/devices/alarm-multiple} fails, we would find its output 
 log in the file \newline \texttt{src/tests/devices/alarm-multiple.output} and its result log in the 
 file \newline \texttt{src/tests/devices/alarm-multiple.result}.
+\newpage
 
 \section{Design Questions}
 \subsection{Data Structures}
 \subsubsection{Purpose of new variables}
+
+\begin{enumerate}
+ \item \begin{lstlisting}
+struct thread
+  {
+    /* Owned by thread.c. */
+    tid_t tid;                          /* Thread identifier. */
+    enum thread_status status;          /* Thread state. */
+    char name[16];                      /* Name (for debugging purposes). */
+    uint8_t *stack;                     /* Saved stack pointer. */
+    int priority;                       /* Priority. */
+    struct list_elem allelem;           /* List element for all threads list. */
+
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
+
+    struct semaphore timer_wait_sema;  //ADDED
+    struct list_elem sleep_elem;       //ADDED 
+    int64_t ticks_to_wake_on;          //ADDED 
+
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+#endif
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
+  };
+\end{lstlisting}
+
+\item \begin{lstlisting}
+struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
+\end{lstlisting}
+
+\end{enumerate}
+
+\begin{enumerate}
+    \item 
+    \begin{enumerate}
+        \item We added a semaphore \texttt{timer\char`_wait\char`_sema} to \texttt{struct thread} to add proper synchronization in case it needs to go to sleep.
+        \item We added a \texttt{list\char`_elem sleem\char`_elem} for the waiting
+        thread list.
+        \item We added a \texttt{int64\_t ticks\_to\_wake\_on} to know how many 
+        ticks does the thread needs to sleep for.
+    \end{enumerate}
+    \item We added a list \texttt{timer\_waiting\_threads} to keep a list of waiting
+    threads in the operating system.
+\end{enumerate}
+
+
+
 \subsection{Algorithms}
 \subsubsection{Call to timer\_sleep()}
 \subsubsection{Minimizing time spent in timer\_interrupt()}
