@@ -209,11 +209,11 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 
 
 \subsection{Algorithms}
-\subsubsection{Call to timer\_sleep()}
-\subsubsection{Minimizing time spent in timer\_interrupt()}
+\subsubsection{Call to timer\textunderscore sleep()}
+\subsubsection{Minimizing time spent in timer\textunderscore interrupt()}
 \subsection{Synchronization}
-\subsubsection{Avoiding race conditions when multiple threads call timer\_sleep()}
-\subsubsection{Avoiding race conditions when timer\_interrupt() is called within timer\_sleep()}
+\subsubsection{Avoiding race conditions when multiple threads call timer\textunderscore sleep()}
+\subsubsection{Avoiding race conditions when timer\textunderscore interrupt() is called within timer\textunderscore sleep()}
 \subsection{Rationale}
 \subsubsection{Choice of design}
 
