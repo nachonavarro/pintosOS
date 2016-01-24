@@ -93,10 +93,6 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
 
-  sema_init(&timer_wait_sema, 0); //ADDED - Initialise semaphore to 0, so sema_down() can be done to make it wait, then
-                                  //        something (timer_interrupt at each tick??) can check whether right amount of
-                                  //        ticks have passed to wake it using sema_up()
-
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -474,6 +470,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  sema_init(&t->timer_wait_sema, 0); //ADDED - Initialise semaphore to 0, so sema_down() can be done to make it wait, then
+                                      //        something (timer_interrupt at each tick??) can check whether right amount of
+                                      //        ticks have passed to wake it using sema_up()
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
