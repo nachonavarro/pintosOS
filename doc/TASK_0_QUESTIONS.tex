@@ -215,8 +215,14 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 \subsubsection{Avoiding race conditions when multiple threads call timer\textunderscore sleep()}
 \subsubsection{Avoiding race conditions when timer\textunderscore interrupt() is called within timer\textunderscore sleep()}
 \subsection{Rationale}
+
 \subsubsection{Choice of design}
 
+A semaphore initialised to 0 is used to make a thread sleep and wake up after the correct amount of ticks, because a semaphore initialised to this value is primarily used to wait for an event that will happen exactly once. This event is the correct amount of ticks having passed since \texttt{timer\_sleep()} was called. This meant that we didn't need to create another data structure to do this task. Another reason that semaphores are useful here is that if there is an interrupt before \texttt{sema\_down()} can be called, but after the thread has been added to the list of waiting threads, which means \texttt{sema\_up()} may be called before \texttt{sema\_down()}, \texttt{timer\_sleep()} will still function correctly. This is because \texttt{sema\_down()} will make the thread wait until the semaphore has a value greater than 0, so if \texttt{sema\_down()} is called after \texttt{sema\_up()}, the thread simply won't wait. This must be correct functionality, as \texttt{sema\_up()} would only be called if the thread was due to wake up.
+
+\subsubsection{Superiority to other designs}
+
+Another design we considered was to use \texttt{thread\_block()} and \texttt{thread\_unblock()} to make the thread sleep and wake up, instead of using a semaphore. This is quite low-level, and semaphores result in a higher level of abstraction in the code. Also, we initially just inserted each new sleeping thread to the front of the list of waiting threads. This meant that during a call to \texttt{timer\_interrupt()}, the whole list had to be traversed, and the function has to check each thread in the list to see if it can be woken up. However, we changed this so that \texttt{list\_insert\_ordered()} is used to insert sleeping threads to the list, where the thread due to wake up first is at the head of the list. This means that if the list is traversed from the head onwards, we can stop traversing the list once we find a thread that can't be woken up yet. This allows less time to be spent in the timer interrupt handler.
 
 
 %----------------------------------------------------------------------------------------
