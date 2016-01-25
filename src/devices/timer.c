@@ -21,7 +21,7 @@
 static int64_t ticks;
 
 /* Number of loops per timer tick.
-   Initialized by timer_calibrate(). */
+   Initialised by timer_calibrate(). */
 static unsigned loops_per_tick;
 
 static intr_handler_func timer_interrupt;
@@ -29,16 +29,13 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-//ADDED - This list will hold all threads that are waiting due to
-//        timer_sleep(), maybe change to use the semaphore waiters
-//        list by changing the way it chooses which waiter to wake up
-struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
 {
+  list_init(&timer_waiting_threads);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -90,7 +87,9 @@ timer_elapsed (int64_t then)
 
 /* Returns true if ticks_to_wake_on of thread a is less than ticks_to_wake_on
    of thread b. */
-bool less_wake(const struct list_elem *a, const struct list_elem *b,
+
+static bool
+less_wake(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
 
   struct thread* thread_to_insert = list_entry(a, struct thread, sleep_elem);
@@ -206,7 +205,7 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
