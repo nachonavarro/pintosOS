@@ -67,9 +67,9 @@
 \section{Preliminary Questions}
 \subsection{Git}
 The Git command that should be run to retrieve a copy of our group's shared 
-Pintos repository in our local directory is git clone \texttt{https://gitlab.doc.ic.ac.uk/lab1516\char`_spring/pintos\char`_18.git}.
+Pintos repository in our local directory is git clone \texttt{https://gitlab.doc.ic.ac.uk/lab1516\_spring/pintos\_18.git}.
 At least one of our members, however, has set up SSH keys and host aliases,
-and would use the shorter \texttt{git clone gitlab:lab1516\char`_spring/pintos\char`_18.git}.
+and would use the shorter \texttt{git clone gitlab:lab1516\_spring/pintos\_18.git}.
 
 \subsection{strcpy()}
 A call to \texttt{strcpy()} can overflow the buffer reserved for its output string. 
@@ -89,22 +89,22 @@ passing the function to be run in the context. When the function returns, the th
 Just before \texttt{schedule()} is called, the current running thread state must be changed from 
 \texttt{THREAD RUNNING}, and interrupts must be disabled. Interrupts will be re-enabled by the next 
 thread to be scheduled. Context switching begins when the \texttt{schedule()} called. From here, 
-running \texttt{\char`_thread()} will be called to store a pointer the current running thread in the variable cur, 
-and next \texttt{next\char`_thread\char`_to\char`_run()} will be called to store a pointer to the next thread to be run in the
+running \texttt{\_thread()} will be called to store a pointer the current running thread in the variable cur, 
+and next \texttt{next\_thread\_to\_run()} will be called to store a pointer to the next thread to be run in the
 variable next. Before any switching occurs, \texttt{schedule()} asserts that interrupts are disabled by calling 
-\texttt{intr\char`_get\char`_level()}, and \texttt{is\char`_thread(next)} is called to assert that next is indeed pointing to a valid thread. 
+\texttt{intr\_get\_level()}, and \texttt{is\_thread(next)} is called to assert that next is indeed pointing to a valid thread. 
 Now, if the pointers obtained earlier aren’t pointing to the same thread (i.e. the next thread to be run 
-is not the thread that is already running), \texttt{switch\char`_threads(cur, next)} is called. When a thread calls 
-\texttt{switch\char`_threads()}, another thread starts running, and the new thread returns from \texttt{switch\char`_threads()}, 
-returning the previously running thread. \texttt{switch\char`_threads()} will save registers on the stack, save 
+is not the thread that is already running), \texttt{switch\_threads(cur, next)} is called. When a thread calls 
+\texttt{switch\_threads()}, another thread starts running, and the new thread returns from \texttt{switch\_threads()}, 
+returning the previously running thread. \texttt{switch\_threads()} will save registers on the stack, save 
 the CPU current stack pointer in the current struct thread’s stack member and restore registers 
-from the stack. The pointer returned from \texttt{switch\char`_threads()} is stored in the variable prev. Finally, 
-\texttt{thread\char`_schedule\char`_tail(prev)} is called to do the rest of the scheduling. This function will change the 
-state of the new thread to \texttt{THREAD\char`_RUNNING}. Also, if the previous thread was dying, it will be 
-destroyed, and the page containing its struct thread and stack will be freed. \texttt{thread\char`_schedule\char`_tail()}
-is separate from \texttt{schedule()} because the first time a thread is created using \texttt{thread\char`_create()}, the 
-new thread hasn’t started running yet, so it cannot be running inside \texttt{switch\char`_threads()}, which is what 
-\texttt{schedule()} expects, so \texttt{thread\char`_schedule\char`_tail()} is called directly when creating some fake stack frames. 
+from the stack. The pointer returned from \texttt{switch\_threads()} is stored in the variable prev. Finally, 
+\texttt{thread\_schedule\_tail(prev)} is called to do the rest of the scheduling. This function will change the 
+state of the new thread to \texttt{THREAD\_RUNNING}. Also, if the previous thread was dying, it will be 
+destroyed, and the page containing its struct thread and stack will be freed. \texttt{thread\_schedule\_tail()}
+is separate from \texttt{schedule()} because the first time a thread is created using \texttt{thread\_create()}, the 
+new thread hasn’t started running yet, so it cannot be running inside \texttt{switch\_threads()}, which is what 
+\texttt{schedule()} expects, so \texttt{thread\_schedule\_tail()} is called directly when creating some fake stack frames. 
 
 \subsection{Lack of reproducibility}
 Reproducibility refers to the capacity of a phenomenon, particularly
@@ -120,17 +120,17 @@ something which might never happen.
 
 \subsection{Printing unsigned integers}
 In Pintos we would first include the \texttt{<stdint.h>} and the \texttt{<inttypes.h>} header file.
-The first header would let us create the \texttt{uint64\char`_t int} and then with the second header
+The first header would let us create the \texttt{uint64\_t int} and then with the second header
 we would \texttt{printf()} the \texttt{int} with the macros \texttt{PRIu64}: \newline
-  \texttt{uint64\char`_t x = ...;} \newline
+  \texttt{uint64\_t x = ...;} \newline
   \texttt{printf("value=\%"PRIu64"", x);}
 
 \subsection{Semaphores and locks}
 Essentially a lock is a subset of a semaphore where the initial value is set to 1. 
-So then regarding functions, a lock has a \texttt{lock\char`_release()} equivalent to a 
-semaphore's \texttt{sema\char`_up()}, a \texttt{lock\char`_try\char`_acquire()} equivalent to a 
-semaphore's \texttt{sema\char`_try\char`_down()} and a \texttt{lock\char`_acquire()} equivalent to a semaphore's
-\texttt{sema\char`_down()}. 
+So then regarding functions, a lock has a \texttt{lock\_release()} equivalent to a 
+semaphore's \texttt{sema\_up()}, a \texttt{lock\_try\_acquire()} equivalent to a 
+semaphore's \texttt{sema\_try\_down()} and a \texttt{lock\_acquire()} equivalent to a semaphore's
+\texttt{sema\_down()}. 
 Regarding data structures, a semaphore struct has a list of waiting threads, 
 while a lock struct has a semaphore struct that itself has a list of waiting threads.
 The extra property that locks have that semaphores do not is that only the thread that 
@@ -143,9 +143,9 @@ Because the kernel stack grows downward from the end of the page, and
 the struct thread is located at the beginning, if the stack grows too
 large it will corrupt the thread state struct.  This overflow is
 detected by examining the final member of the struct, ordinarily set
-to the value \texttt{THREAD\char`_MAGIC}.  If it is not, the stack must have
+to the value \texttt{THREAD\_MAGIC}.  If it is not, the stack must have
 overflowed and rewritten it.  While it is in principle possible for
-the overflowing value to be equal to \texttt{THREAD\char`_MAGIC}, Pintos does not
+the overflowing value to be equal to \texttt{THREAD\_MAGIC}, Pintos does not
 handle this (unlikely) case.
 
 \subsection{Output of test's failures}
@@ -196,11 +196,11 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 \begin{enumerate}
     \item 
     \begin{enumerate}
-        \item We added a semaphore \texttt{timer\char`_wait\char`_sema} to \texttt{struct thread} to add proper synchronization in case it needs to go to sleep.
-        \item We added a \texttt{list\char`_elem sleem\char`_elem} for the waiting
+        \item We added a semaphore \texttt{timer\_wait\_sema} to \texttt{struct thread} to add proper synchronization in case it needs to go to sleep.
+        \item We added a \texttt{list\_elem sleep\_elem} for the waiting
         thread list.
         \item We added a \texttt{int64\_t ticks\_to\_wake\_on} to know how many 
-        ticks does the thread needs to sleep for.
+        ticks the thread needs to sleep for.
     \end{enumerate}
     \item We added a list \texttt{timer\_waiting\_threads} to keep a list of waiting
     threads in the operating system.
@@ -211,32 +211,42 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 \subsection{Algorithms}
 \subsubsection{Call to timer\textunderscore sleep()}
 
-In a call to timer \textunderscore sleep(), the following steps are executed:
+In a call to timer\textunderscore sleep(), the following steps are executed:
 
 \begin{enumerate}
     \item We check that the number of ticks given as an integer argument is strictly positive. If it is not, we return straight away as the thread is not meant to sleep.
     \item We calculate the tick number that the thread needs to wake on, depending on the current number of ticks and the argument given to the function.
-    \item We insert the thread in an ordered list at the right position, using a function pointer less \textunderscore wake that compares the number of ticks needed for two threads to wake up.
-    \item Finally, we call the sema \textunderscore down method on the thread's semaphore to make it wait until a sema \textunderscore up method is called on that thread's semaphore.
+    \item We insert the thread in an ordered list at the right position, using a function pointer less\textunderscore wake that compares the number of ticks needed for two threads to wake up.
+    \item Finally, we call the sema\textunderscore down method on the thread's semaphore to make it wait until a sema\textunderscore up method is called on that thread's semaphore.
 \end{enumerate}
 
-On each timer tick, the following actions are performed by the timer \textunderscore interrupt() method:
+On each timer tick, the following actions are performed by the timer\textunderscore interrupt() method:
 
 \begin{enumerate}
     \item The number of ticks is incremented.
-    \item We traverse the list of waiting threads, removing from the list and calling sema \textunderscore up on each thread which has to be woken up.
+    \item We traverse the list of waiting threads, removing from the list and calling sema\textunderscore up on each thread which has to be woken up.
 \end{enumerate}
 
 \subsubsection{Minimizing time spent in timer\textunderscore interrupt()}
 
-To minimise the time spent in timer \textunderscore interrupt(), we have decided to use an ordered list of threads waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a break statement.  
+To minimise the time spent in timer\textunderscore interrupt(), we have decided to use an ordered list of threads waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a break statement. This is more efficient than looping through all the threads using the thread\textunderscore foreach() method.
 
 \subsection{Synchronization}
 \subsubsection{Avoiding race conditions when multiple threads call timer\textunderscore sleep()}
+To avoid race conditions when multiple threads call \texttt{timer\_sleep()} we used a semaphore that each thread owns. When a thread
+enters a 
 \subsubsection{Avoiding race conditions when timer\textunderscore interrupt() is called within timer\textunderscore sleep()}
+To avoid race condition when \texttt{timer\_interrupt()} is called within \texttt{timer\_sleep()} we use a semaphore. So then it doesn't 
+matter if \texttt{sema\_up()} is called in \texttt{timer\_interrupt()} before \texttt{sema\_down()} in \texttt{timer\_sleep()} or vice versa.
 \subsection{Rationale}
+
 \subsubsection{Choice of design}
 
+A semaphore initialised to 0 is used to make a thread sleep and wake up after the correct amount of ticks, because a semaphore initialised to this value is primarily used to wait for an event that will happen exactly once. This event is the correct amount of ticks having passed since \texttt{timer\_sleep()} was called. This meant that we didn't need to create another data structure to do this task. Another reason that semaphores are useful here is that if there is an interrupt before \texttt{sema\_down()} can be called, but after the thread has been added to the list of waiting threads, which means \texttt{sema\_up()} may be called before \texttt{sema\_down()}, \texttt{timer\_sleep()} will still function correctly. This is because \texttt{sema\_down()} will make the thread wait until the semaphore has a value greater than 0, so if \texttt{sema\_down()} is called after \texttt{sema\_up()}, the thread simply won't wait. This must be correct functionality, as \texttt{sema\_up()} would only be called if the thread was due to wake up.
+
+\subsubsection{Superiority to other designs}
+
+Another design we considered was to use \texttt{thread\_block()} and \texttt{thread\_unblock()} to make the thread sleep and wake up, instead of using a semaphore. This is quite low-level, and semaphores result in a higher level of abstraction in the code. Also, we initially just inserted each new sleeping thread to the front of the list of waiting threads. This meant that during a call to \texttt{timer\_interrupt()}, the whole list had to be traversed, and the function has to check each thread in the list to see if it can be woken up. However, we changed this so that \texttt{list\_insert\_ordered()} is used to insert sleeping threads to the list, where the thread due to wake up first is at the head of the list. This means that if the list is traversed from the head onwards, we can stop traversing the list once we find a thread that can't be woken up yet. This allows less time to be spent in the timer interrupt handler.
 
 
 %----------------------------------------------------------------------------------------

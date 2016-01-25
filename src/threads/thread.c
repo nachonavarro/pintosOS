@@ -470,9 +470,8 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  sema_init(&t->timer_wait_sema, 0); //ADDED - Initialise semaphore to 0, so sema_down() can be done to make it wait, then
-                                      //        something (timer_interrupt at each tick??) can check whether right amount of
-                                      //        ticks have passed to wake it using sema_up()
+  /* Initialise semaphore to 0 to synchronise sleeping threads. */
+  sema_init(&t->timer_wait_sema, 0);
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
