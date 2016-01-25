@@ -88,11 +88,11 @@ A thread can be have one of four states - \texttt{THREAD\_RUNNING}, \texttt{THRE
 passing the function to be run in the context. When the function returns, the thread terminates. 
 Just before \texttt{schedule()} is called, the current running thread state must be changed from 
 \texttt{THREAD RUNNING}, and interrupts must be disabled. Interrupts will be re-enabled by the next 
-thread to be scheduled. Context switching begins when the \texttt{schedule()} called. From here, 
-running \texttt{\_thread()} will be called to store a pointer the current running thread in the variable cur, 
+thread to be scheduled. Context switching begins when \texttt{schedule()} is called. From here, 
+\texttt{running\_thread()} will be called to store a pointer the current running thread in the variable \texttt{cur}, 
 and next \texttt{next\_thread\_to\_run()} will be called to store a pointer to the next thread to be run in the
-variable next. Before any switching occurs, \texttt{schedule()} asserts that interrupts are disabled by calling 
-\texttt{intr\_get\_level()}, and \texttt{is\_thread(next)} is called to assert that next is indeed pointing to a valid thread. 
+variable \texttt{next}. Before any switching occurs, \texttt{schedule()} asserts that interrupts are disabled by calling 
+\texttt{intr\_get\_level()}, and \texttt{is\_thread(next)} is called to assert that \texttt{next} is indeed pointing to a valid thread. 
 Now, if the pointers obtained earlier aren’t pointing to the same thread (i.e. the next thread to be run 
 is not the thread that is already running), \texttt{switch\_threads(cur, next)} is called. When a thread calls 
 \texttt{switch\_threads()}, another thread starts running, and the new thread returns from \texttt{switch\_threads()}, 
@@ -103,7 +103,7 @@ from the stack. The pointer returned from \texttt{switch\_threads()} is stored i
 state of the new thread to \texttt{THREAD\_RUNNING}. Also, if the previous thread was dying, it will be 
 destroyed, and the page containing its struct thread and stack will be freed. \texttt{thread\_schedule\_tail()}
 is separate from \texttt{schedule()} because the first time a thread is created using \texttt{thread\_create()}, the 
-new thread hasn’t started running yet, so it cannot be running inside \texttt{switch\_threads()}, which is what 
+new thread hasn't started running yet, so it cannot be running inside \texttt{switch\_threads()}, which is what 
 \texttt{schedule()} expects, so \texttt{thread\_schedule\_tail()} is called directly when creating some fake stack frames. 
 
 \subsection{Lack of reproducibility}
@@ -211,25 +211,25 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 \subsection{Algorithms}
 \subsubsection{Call to timer\textunderscore sleep()}
 
-In a call to timer\textunderscore sleep(), the following steps are executed:
+In a call to \texttt{timer\_sleep()}, the following steps are executed:
 
 \begin{enumerate}
     \item We check that the number of ticks given as an integer argument is strictly positive. If it is not, we return straight away as the thread is not meant to sleep.
     \item We calculate the tick number that the thread needs to wake on, depending on the current number of ticks and the argument given to the function.
-    \item We insert the thread in an ordered list at the right position, using a function pointer less\textunderscore wake that compares the number of ticks needed for two threads to wake up.
-    \item Finally, we call the sema\textunderscore down method on the thread's semaphore to make it wait until a sema\textunderscore up method is called on that thread's semaphore.
+    \item We insert the thread in an ordered list at the right position, using a function pointer \texttt{less\_wake} that compares the number of ticks needed for two threads to wake up.
+    \item Finally, we call the \texttt{sema\_down} method on the thread's semaphore to make it wait until a \texttt{sema\_up} method is called on that thread's semaphore.
 \end{enumerate}
 
-On each timer tick, the following actions are performed by the timer\textunderscore interrupt() method:
+On each timer tick, the following actions are performed by the \texttt{timer\_interrupt()} method:
 
 \begin{enumerate}
     \item The number of ticks is incremented.
-    \item We traverse the list of waiting threads, removing from the list and calling sema\textunderscore up on each thread which has to be woken up.
+    \item We traverse the list of waiting threads, removing from the list and calling \texttt{sema\_up} on each thread which has to be woken up.
 \end{enumerate}
 
 \subsubsection{Minimizing time spent in timer\textunderscore interrupt()}
 
-To minimise the time spent in timer\textunderscore interrupt(), we have decided to use an ordered list of threads waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a break statement. This is more efficient than looping through all the threads using the thread\textunderscore foreach() method.
+To minimise the time spent in \texttt{timer\_interrupt()}, we have decided to use an ordered list of threads waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a break statement. This is more efficient than looping through all the threads using the \texttt{thread\_foreach()} method.
 
 \subsection{Synchronization}
 \subsubsection{Avoiding race conditions when multiple threads call timer\textunderscore sleep()}
