@@ -197,10 +197,10 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
     \item 
     \begin{enumerate}
         \item We added a semaphore \texttt{timer\_wait\_sema} to \texttt{struct thread} to add proper synchronization in case it needs to go to sleep.
-        \item We added a \texttt{list\_elem sleem\_elem} for the waiting
+        \item We added a \texttt{list\_elem sleep\_elem} for the waiting
         thread list.
         \item We added a \texttt{int64\_t ticks\_to\_wake\_on} to know how many 
-        ticks does the thread needs to sleep for.
+        ticks the thread needs to sleep for.
     \end{enumerate}
     \item We added a list \texttt{timer\_waiting\_threads} to keep a list of waiting
     threads in the operating system.
