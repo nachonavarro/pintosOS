@@ -84,7 +84,7 @@ The default length of a scheduler time slice in Pintos is 4 ticks,
 which is equivalent to 0.04 seconds, as the timer ticks 100 times per second.
 
 \subsection{Thread system}
-The function \texttt{thread\char`_create(name, priority, function, argument)} creates a new context to be scheduled, 
+A thread can be have one of four states - \texttt{THREAD_RUNNING}, \texttt{THREAD_READY}, \texttt{THREAD_BLOCKED} or \texttt{THREAD_DYING}. The function \texttt{thread\char`_create(name, priority, function, argument)} creates a new context to be scheduled, 
 passing the function to be run in the context. When the function returns, the thread terminates. 
 Just before \texttt{schedule()} is called, the current running thread state must be changed from 
 \texttt{THREAD RUNNING}, and interrupts must be disabled. Interrupts will be re-enabled by the next 
