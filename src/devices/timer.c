@@ -125,8 +125,11 @@ timer_sleep (int64_t ticks)
      so the thread that should wake up first goes at the head of the list.
      If a thread that is due to wake up at the same time as a currently
      sleeping thread is added to the list, it will be inserted after the
-     other thread. */
+     other thread. We disable interrupts for a possible race condition when inserting
+     elements in the ordered list. */
+  enum intr_level old_level = intr_disable ();
   list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_wake, ticks_to_wake_on);
+  intr_set_level (old_level);
   /* sema_down is called on this threads timer_wait_sema member. This causes
      the thread to wait until sema_up is called in timer_interrupt when the
      thread is due to wake up, according to its ticks_to_wake_on member.
