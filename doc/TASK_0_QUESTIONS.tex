@@ -211,25 +211,25 @@ struct list timer_waiting_threads = LIST_INITIALIZER(timer_waiting_threads);
 \subsection{Algorithms}
 \subsubsection{Call to timer\textunderscore sleep()}
 
-In a call to timer \textunderscore sleep(), the following steps are executed:
+In a call to timer\textunderscore sleep(), the following steps are executed:
 
 \begin{enumerate}
     \item We check that the number of ticks given as an integer argument is strictly positive. If it is not, we return straight away as the thread is not meant to sleep.
     \item We calculate the tick number that the thread needs to wake on, depending on the current number of ticks and the argument given to the function.
-    \item We insert the thread in an ordered list at the right position, using a function pointer less \textunderscore wake that compares the number of ticks needed for two threads to wake up.
-    \item Finally, we call the sema \textunderscore down method on the thread's semaphore to make it wait until a sema \textunderscore up method is called on that thread's semaphore.
+    \item We insert the thread in an ordered list at the right position, using a function pointer less\textunderscore wake that compares the number of ticks needed for two threads to wake up.
+    \item Finally, we call the sema\textunderscore down method on the thread's semaphore to make it wait until a sema\textunderscore up method is called on that thread's semaphore.
 \end{enumerate}
 
-On each timer tick, the following actions are performed by the timer \textunderscore interrupt() method:
+On each timer tick, the following actions are performed by the timer\textunderscore interrupt() method:
 
 \begin{enumerate}
     \item The number of ticks is incremented.
-    \item We traverse the list of waiting threads, removing from the list and calling sema \textunderscore up on each thread which has to be woken up.
+    \item We traverse the list of waiting threads, removing from the list and calling sema\textunderscore up on each thread which has to be woken up.
 \end{enumerate}
 
 \subsubsection{Minimizing time spent in timer\textunderscore interrupt()}
 
-To minimise the time spent in timer \textunderscore interrupt(), we have decided to use an ordered list of threads waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a break statement.  
+To minimise the time spent in timer\textunderscore interrupt(), we have decided to use an ordered list of threads waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a break statement. This is more efficient than looping through all the threads using the thread\textunderscore foreach() method.
 
 \subsection{Synchronization}
 \subsubsection{Avoiding race conditions when multiple threads call timer\textunderscore sleep()}
