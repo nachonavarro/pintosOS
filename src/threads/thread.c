@@ -341,9 +341,13 @@ thread_foreach (thread_action_func *func, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority (int new_priority)
 {
-  thread_current()->priority = new_priority;
+  struct thread *t = thread_current();
+  if (t->effective_priority == t->priority)
+    t->effective_priority=new_priority;
+
+  t->priority = new_priority;
 }
 
 /* Returns the current thread's priority. */
@@ -470,6 +474,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->effective_priority = priority;
   /* Initialise semaphore to 0 to synchronise sleeping threads. */
   sema_init(&t->timer_wait_sema, 0);
   t->magic = THREAD_MAGIC;
