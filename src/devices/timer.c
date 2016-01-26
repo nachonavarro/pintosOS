@@ -111,30 +111,19 @@ timer_sleep (int64_t ticks)
       return;
   }
 
-  /* When ticks_to_wake_on ticks have passed (Since the OS booted), this
-     thread can be woken. */
-  int64_t ticks_to_wake_on = ticks + timer_ticks();
-
   ASSERT (intr_get_level () == INTR_ON);
 
-  /* Find current thread (The one that will be sleeping) and
-  set its ticks_to_wake_on member. */
+  enum intr_level old_level = intr_disable ();
+  /* When ticks_to_wake_on ticks have passed (Since the OS booted), this
+       thread can be woken. */
+    int64_t ticks_to_wake_on = ticks + timer_ticks();
   struct thread* cur = thread_current();
   cur->ticks_to_wake_on = ticks_to_wake_on;
-  /* Insert the thread into a list of sleeping threads. This list is ordered,
-     so the thread that should wake up first goes at the head of the list.
-     If a thread that is due to wake up at the same time as a currently
-     sleeping thread is added to the list, it will be inserted after the
-     other thread. We disable interrupts for a possible race condition when inserting
-     elements in the ordered list. */
-  enum intr_level old_level = intr_disable ();
+  /* Insert the thread into a list of sleeping threads. */
   list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_wake, ticks_to_wake_on);
   intr_set_level (old_level);
-  /* sema_down is called on this threads timer_wait_sema member. This causes
-     the thread to wait until sema_up is called in timer_interrupt when the
-     thread is due to wake up, according to its ticks_to_wake_on member.
-     If a timer interrupt happens here, there would not be a problem
-     (Explained in timer_interrupt function). */
+  /* Causes the thread to wait until sema_up is called in timer_interrupt when the
+     thread is due to wake up, according to its ticks_to_wake_on member. */
   sema_down(&cur->timer_wait_sema);
 
 }
@@ -216,8 +205,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
-  enum intr_level intr_old_level = intr_disable();
-
   struct list_elem *e;
 
   /* Traverse the list from the beginning of the list. */
@@ -234,17 +221,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
       /* Removes the thread that is due to wake up (Traversal of list would
          have stopped if this thread was not due to wake up). */
       list_remove(e);
-      /* Wakes up the sleeping thread. Doesn't matter if this is called before
-         sema_down (But after the thread has been added to the waiting list,
-         otherwise sema_up would not be called), as if this was the case,
-         sema_down would just not wait, which is fine as the fact that sema_up
-         was called means that the thread is due to be woken. */
+      /* Wakes up the sleeping thread.*/
       sema_up(&waiting_thread->timer_wait_sema);
-
   }
-
-  intr_set_level(intr_old_level);
-
 }
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */

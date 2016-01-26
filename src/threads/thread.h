@@ -94,10 +94,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    struct semaphore timer_wait_sema;  //ADDED - The semaphore to make the thread wait - used only by timer (For now??)
-                                       //        Eliminates the need to thread_block(), which is good!
+    struct semaphore timer_wait_sema;   /* Semaphore to make the thread wait. */
 
-    struct list_elem sleep_elem;      // ADDED - we need specific list_elem for sleeping threads.
+    struct list_elem sleep_elem;        /* list_elem for sleeping threads. */
     int64_t ticks_to_wake_on;
 
 #ifdef USERPROG
