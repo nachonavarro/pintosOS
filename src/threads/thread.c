@@ -344,10 +344,13 @@ void
 thread_set_priority (int new_priority)
 {
   struct thread *t = thread_current();
+  int oldpri=thread_get_priority();
   if (t->effective_priority == t->priority)
     t->effective_priority=new_priority;
 
   t->priority = new_priority;
+  if(new_priority < oldpri)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
