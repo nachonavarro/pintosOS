@@ -209,12 +209,16 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  if (lock->holder != NULL) {
-	  int old_priority = lock->holder->effective_priority;
-	  lock->holder->effective_priority = thread_get_priority();
-	  sema_down (&lock->semaphore);
-	  lock->holder->effective_priority = old_priority;
-  }
+  /* if nothing holds the lock, let lock_try_acquire do its thing and
+   * we're done, otherwise just continue.
+   */
+  if (lock_try_acquire(lock))
+    return;
+
+  int old_priority = lock->holder->effective_priority;
+  lock->holder->effective_priority = thread_get_priority();
+  sema_down (&lock->semaphore);
+  lock->holder->effective_priority = old_priority;
   lock->holder = thread_current ();
 }
 
