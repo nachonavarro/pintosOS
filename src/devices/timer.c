@@ -120,7 +120,7 @@ timer_sleep (int64_t ticks)
   struct thread* cur = thread_current();
   cur->ticks_to_wake_on = ticks_to_wake_on;
   /* Insert the thread into a list of sleeping threads. */
-  list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_wake, ticks_to_wake_on);
+  list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_wake, NULL);
   intr_set_level (old_level);
   /* Causes the thread to wait until sema_up is called in timer_interrupt when the
      thread is due to wake up, according to its ticks_to_wake_on member. */
