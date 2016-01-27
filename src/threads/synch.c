@@ -81,9 +81,12 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_insert_ordered(&sema->waiters, &thread_current()->elem, higher_priority, NULL);
-      thread_block ();
+      thread_block();
     }
   sema->value--;
+  if (!list_empty(&sema->waiters)) {
+  	  	  ASSERT(is_sorted(list_begin(&sema->waiters), list_end(&sema->waiters), higher_priority, NULL));
+  	    }
   intr_set_level (old_level);
 }
 
@@ -125,9 +128,10 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)) {
+	ASSERT(is_sorted(list_begin(&sema->waiters), list_end(&sema->waiters), higher_priority, NULL));
+    thread_unblock(list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+  }
   sema->value++;
   thread_yield();
   intr_set_level (old_level);
@@ -215,11 +219,13 @@ lock_acquire (struct lock *lock)
   if (lock_try_acquire(lock))
     return;
 
-  int old_priority = lock->holder->effective_priority;
-  lock->holder->effective_priority = thread_get_priority();
+  struct thread *lock_holder = lock->holder;
+
+  int old_priority = lock_holder->effective_priority;
+  lock_holder->effective_priority = thread_get_priority();
   sema_down (&lock->semaphore);
-  lock->holder->effective_priority = old_priority;
-  lock->holder = thread_current ();
+  lock_holder->effective_priority = old_priority;
+  lock->holder = thread_current();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -254,7 +260,7 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
-  sema_up (&lock->semaphore);
+  sema_up(&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -267,7 +273,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem 
   {

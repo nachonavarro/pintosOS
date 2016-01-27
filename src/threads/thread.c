@@ -209,6 +209,11 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* Yield if new thread's priority is higher. */
+  if (thread_current()->priority < priority) {
+	  thread_yield();
+  }
+
   return tid;
 }
 
@@ -224,8 +229,8 @@ thread_block (void)
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
 
-  thread_current ()->status = THREAD_BLOCKED;
-  schedule ();
+  thread_current()->status = THREAD_BLOCKED;
+  schedule();
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -246,6 +251,11 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered(&ready_list, &t->elem, higher_priority, NULL);
+
+  if (!list_empty(&ready_list)) {
+	  ASSERT(is_sorted(list_begin(&ready_list), list_end(&ready_list), higher_priority, NULL));
+  }
+
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -309,16 +319,19 @@ thread_exit (void)
 void
 thread_yield (void) 
 {
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current();
   enum intr_level old_level;
   
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, higher_priority, NULL);
+  if (!list_empty(&ready_list)) {
+  	  ASSERT(is_sorted(list_begin(&ready_list), list_end(&ready_list), higher_priority, NULL));
+    }
   cur->status = THREAD_READY;
-  schedule ();
+  schedule();
   intr_set_level (old_level);
 }
 
@@ -390,7 +403,7 @@ thread_get_recent_cpu (void)
   /* Not yet implemented. */
   return 0;
 }
-
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -439,7 +452,7 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
 }
-
+
 /* Returns the running thread. */
 struct thread *
 running_thread (void) 
@@ -511,7 +524,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+    return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page
