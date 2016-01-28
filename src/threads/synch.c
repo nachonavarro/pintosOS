@@ -223,16 +223,32 @@ lock_acquire (struct lock *lock)
   /* if nothing holds the lock, let lock_try_acquire do its thing and
    * we're done, otherwise just continue.
    */
-  if (lock_try_acquire(lock))
-    return;
+  if (lock_try_acquire(lock)) {
+	  lock->effective = thread_get_priority();
+	  return;
+  }
 
-  struct thread *lock_holder = lock->holder;
-
-  int old_priority = lock_holder->effective_priority;
-  lock_holder->effective_priority = thread_get_priority();
+  list_push_back(&lock->waiters_on_lock, &thread_current()->blocked_elem);
+  int old_priority = lock->effective;  //old_pri = lock_pri
+  lock->effective = find_highest_priority_nested(lock);
   sema_down (&lock->semaphore);
-  lock_holder->effective_priority = old_priority;
+  list_remove(&thread_current()->blocked_elem);
+  lock->effective = old_priority; // lock_pri = old_pri
   lock->holder = thread_current();
+  list_push_back(&thread_current()->locks_holding, &lock->lock_elem);
+}
+
+int
+find_highest_priority_nested(struct lock *lock) {
+	int max = -1;
+	struct list_elem *e;
+	for (e = list_begin (&lock->waiters_on_lock); e != list_end (&lock->waiters_on_lock); e = list_next (e)) {
+	      struct thread *t = list_entry (e, struct thread, blocked_elem);
+	      if (get_highest_priority(t) > max) {
+	    	  max = get_highest_priority(t);
+	      }
+	}
+	return max;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
