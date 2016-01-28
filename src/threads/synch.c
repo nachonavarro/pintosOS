@@ -266,8 +266,10 @@ lock_try_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   success = sema_try_down (&lock->semaphore);
-  if (success)
-    lock->holder = thread_current ();
+  if (success) {
+	  list_push_back(&thread_current()->locks_holding, &lock->lock_elem);
+	  lock->holder = thread_current();
+  }
   return success;
 }
 
@@ -283,6 +285,7 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
+  list_remove(&lock->lock_elem);
   sema_up(&lock->semaphore);
 }
 
@@ -346,9 +349,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  //list_insert_ordered(&cond->waiters, &waiter.elem, higher_priority, NULL);
-  //TODO: Taken away ordered list for now (Apart from ready_list) and will just traverse whole list
-  list_push_back(&cond->waiters, &waiter.elem);
+  list_insert_ordered(&cond->waiters, &waiter.elem, higher_priority, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);

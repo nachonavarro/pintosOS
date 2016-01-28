@@ -89,7 +89,6 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Base priority. */
-    int effective_priority;             /* Effective priority */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -99,6 +98,9 @@ struct thread
 
     struct list_elem sleep_elem;        /* list_elem for sleeping threads. */
     int64_t ticks_to_wake_on;
+
+    struct list locks_holding;
+    struct list_elem blocked_elem;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -132,6 +134,8 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+int get_highest_priority(struct thread *t);
+bool higher_lock_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
