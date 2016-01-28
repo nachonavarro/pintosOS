@@ -362,19 +362,29 @@ thread_set_priority (int new_priority)
     t->effective_priority=new_priority;
   }
 
-  t->priority = new_priority;
-  if(new_priority < oldpri)
-    thread_yield();
-
-  /* If thread was in the ready list, we remove it and then reinsert
-     it in the correct place. This is because the ready_list must
-     must be ordered, due to the fact that next_thread_to_run()
-     will pop the front item off of the ready_list. */
+  /* If thread was in the ready list, we sort ready_list so that the
+       thread is in the correct place. This is because the ready_list must
+       must be ordered, due to the fact that next_thread_to_run()
+       will pop the front item off of the ready_list. */
   //TODO: This may not be necessary.
   if (t->status == THREAD_READY) {
-      list_remove(&t->elem);
-      list_insert_ordered(&ready_list, &t->elem, higher_priority, NULL);
+      list_sort(&ready_list, higher_priority, NULL);
   }
+
+  t->priority = new_priority;
+
+  if (!list_empty(&ready_list)) {
+      struct thread *next_to_run =
+              list_entry(list_begin(&ready_list), struct thread, elem);
+      if (next_to_run->effective_priority > new_priority) {
+          if (intr_context()) {
+              intr_yield_on_return();
+          } else {
+              thread_yield();
+          }
+      }
+  }
+
 }
 
 /* Returns the current thread's priority. */
