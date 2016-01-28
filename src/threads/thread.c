@@ -351,12 +351,30 @@ thread_set_priority (int new_priority)
 {
   struct thread *t = thread_current();
   int oldpri=thread_get_priority();
-  if (t->effective_priority == t->priority)
+  /* If the effective priority is the same as the base priority, this
+     thread has not received any donations, so we need to make sure that
+     we change effective priority too, as effective >= base.
+     Also, to keep effective >= base true, if base priority would be set
+     higher than a threads highest donation priority, we should make
+     effective = new priority too.*/
+  if ((t->effective_priority == t->priority)
+          || (t->effective_priority < new_priority)) {
     t->effective_priority=new_priority;
+  }
 
   t->priority = new_priority;
   if(new_priority < oldpri)
     thread_yield();
+
+  /* If thread was in the ready list, we remove it and then reinsert
+     it in the correct place. This is because the ready_list must
+     must be ordered, due to the fact that next_thread_to_run()
+     will pop the front item off of the ready_list. */
+  //TODO: This may not be necessary.
+  if (t->status == THREAD_READY) {
+      list_remove(&t->elem);
+      list_insert_ordered(&ready_list, &t->elem, higher_priority, NULL);
+  }
 }
 
 /* Returns the current thread's priority. */
