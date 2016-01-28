@@ -55,9 +55,9 @@ higher_priority(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
 
   struct thread* thread_to_insert = list_entry(a, struct thread, elem);
-  int64_t a_priority =  thread_to_insert->effective_priority;
+  int64_t a_priority =  get_highest_priority(thread_to_insert);
   struct thread* thread_in_list = list_entry(b, struct thread, elem);
-  int64_t b_priority =  thread_in_list->effective_priority;
+  int64_t b_priority =  get_highest_priority(thread_in_list);
 
   return a_priority > b_priority;
 }
@@ -201,6 +201,8 @@ lock_init (struct lock *lock)
 
   lock->holder = NULL;
   sema_init (&lock->semaphore, 1);
+  list_init(&lock->waiters_on_lock);
+
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
