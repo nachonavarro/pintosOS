@@ -55,9 +55,9 @@ higher_priority(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
 
   struct thread* thread_to_insert = list_entry(a, struct thread, elem);
-  int64_t a_priority =  get_highest_priority(thread_to_insert);
+  int64_t a_priority =  thread_to_insert->effective_priority;
   struct thread* thread_in_list = list_entry(b, struct thread, elem);
-  int64_t b_priority =  get_highest_priority(thread_in_list);
+  int64_t b_priority =  thread_in_list->effective_priority;
 
   return a_priority > b_priority;
 }
@@ -78,14 +78,14 @@ sema_down (struct semaphore *sema)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
+  thread_current()->waiting_on_sema = sema;
   while (sema->value == 0) 
     {
-      //list_insert_ordered(&sema->waiters, &thread_current()->elem, higher_priority, NULL);
-      //TODO: Taken away ordered list for now (Apart from ready_list) and will just traverse whole list
-      list_push_back(&sema->waiters, &thread_current()->elem);
+      list_insert_ordered(&sema->waiters, &thread_current()->elem, higher_priority, NULL);
       thread_block();
     }
   sema->value--;
+  thread_current()->waiting_on_sema = NULL;
   intr_set_level (old_level);
 }
 
