@@ -183,7 +183,7 @@ sema_test_helper (void *sema_)
    semaphore is twofold.  First, a semaphore can have a value
    greater than 1, but a lock can only be owned by a single
    thread at a time.  Second, a semaphore does not have an owner,
-   meaning that one thread can "down" the semaphore and then
+   meaning that one thread can "down" the semaphore and thestruct threadn
    another one "up" it, but with a lock the same thread must both
    acquire and release it.  When these restrictions prove
    onerous, it's a good sign that a semaphore should be used,

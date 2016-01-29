@@ -210,7 +210,7 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   /* Yield if new thread's priority is higher. */
-  if (thread_current()->priority < priority) {
+  if (thread_current()->base_priority < priority) {
 	  thread_yield();
   }
 
@@ -351,12 +351,18 @@ thread_set_priority (int new_priority)
 {
   struct thread *t = thread_current();
 
-  t->priority = new_priority;
+  t->base_priority = new_priority;
+
+  if (t->base_priority > t->effective_priority) {
+	  t->effective_priority = t->base_priority;
+  }
+
+  thread_recalculate_effective_priority(t);
 
   if (!list_empty(&ready_list)) {
       struct thread *next_to_run =
               list_entry(list_begin(&ready_list), struct thread, elem);
-      if (get_highest_priority(next_to_run) > new_priority) {
+      if (next_to_run->effective_priority > new_priority) {
           if (intr_context()) {
               intr_yield_on_return();
           } else {
@@ -366,54 +372,71 @@ thread_set_priority (int new_priority)
   }
 }
 
-int
-get_highest_priority(struct thread *t) {
-	if (!list_empty(&t->locks_holding)) {
-		struct list_elem *elem = list_min(&t->locks_holding, higher_lock_priority, NULL);
-		ASSERT(elem != NULL);
-		struct lock *lock = list_entry(elem, struct lock, lock_elem);
-		ASSERT(lock != NULL);
-		return lock->effective > t->priority ? lock->effective : t->priority;
+void
+thread_donate_priority (struct thread *t, int priority) {
+	if (t->effective_priority >= priority) {
+		return;
 	}
-	return t->priority;
+
+	t->effective_priority = priority;
+
+	// If we change the priority, we need to reinsert the new priority in order.
+
+	if (t->status == THREAD_BLOCKED) {
+		ASSERT (!list_empty (&t->waiting_on_sema->waiters));
+
+		list_remove(&t->elem);
+		list_insert_ordered(&t->waiting_on_sema->waiters, &t->elem, higher_priority, NULL);
+		//list_sort(&t->waiting_on_sema->waiters, higher_priority, NULL);
+	} else if (t->status == THREAD_READY) {
+		ASSERT (!list_empty (&ready_list));
+
+		list_remove(&t->elem);
+		list_insert_ordered(&ready_list, &t->elem, higher_priority, NULL);
+
+		//list_sort(&ready_list, higher_priority, NULL);
+	} else {
+		ASSERT (false);
+	}
+
+	if (t->waiting_on_lock != NULL) {
+		ASSERT(&t->waiting_on_lock->holder != NULL);
+		thread_donate_priority(t->waiting_on_lock->holder, priority);
+	}
 }
 
-bool
-higher_lock_priority(const struct list_elem *a, const struct list_elem *b,
-            void *aux UNUSED) {
+void
+thread_recalculate_effective_priority(struct thread *t) {
+	int max = t->base_priority;
+	struct list_elem *e = NULL;
+	if (list_empty(&t->locks_holding)) {
+		t->effective_priority = t->base_priority;
+		return;
+	}
+	for (e = list_begin (&t->locks_holding); e != list_end (&t->locks_holding); e = list_next (e)) {
+		  struct lock *lock = list_entry (e, struct lock, lock_elem);
+		  if (!list_empty(&lock->semaphore.waiters)) {
+			  int local_max = list_entry(list_begin(&lock->semaphore.waiters),
+								  struct thread, elem)->effective_priority;
+			  if (local_max > max) {
+				  max = local_max;
+			  }
+		  }
+	}
+	t->effective_priority = max;
 
-  struct lock* lock_a = list_entry(a, struct lock, lock_elem);
-  int64_t a_priority =  lock_a->effective;
-  struct lock* lock_b = list_entry(b, struct lock, lock_elem);
-  int64_t b_priority =  lock_b->effective;
-
-  return a_priority > b_priority;
-
+	if (thread_current()->effective_priority <
+			list_entry(list_begin(&ready_list), struct thread, elem)->effective_priority) {
+		thread_yield();
+	}
 }
+
 /* Returns the current thread's priority. */
 int
-thread_get_priority (void) 
+thread_get_priority (void)
 {
-	return get_highest_priority(thread_current());
+	return thread_current()->effective_priority;
 }
-
-//int
-//thread_get_priority (void)
-//{
-//	int max = -1;
-//	struct thread *cur = thread_current();
-//	struct list_elem *e;
-//	if (list_empty(&cur->locks_holding)) {
-//		return PRI_DEFAULT;
-//	}
-//	for (e = list_begin (&cur->locks_holding); e != list_end (&cur->locks_holding); e = list_next (e)) {
-//	      struct lock *lock = list_entry (e, struct lock, lock_elem);
-//	      if (find_highest_priority_nested(lock) > max) {
-//	    	  max = find_highest_priority_nested(lock);
-//	      }
-//	}
-//	return max;
-//}
 
 /* Sets the current thread's nice value to NICE. */
 void
@@ -531,9 +554,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  t->base_priority = t->effective_priority = priority;
   list_init(&t->locks_holding);
   /* Initialise semaphore to 0 to synchronise sleeping threads. */
+  t->waiting_on_lock = NULL;
   sema_init(&t->timer_wait_sema, 0);
   t->magic = THREAD_MAGIC;
 
