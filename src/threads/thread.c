@@ -250,7 +250,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, higher_priority, NULL);
+  list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -322,7 +322,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, higher_priority, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, less_priority, NULL);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level (old_level);
@@ -351,17 +351,22 @@ thread_set_priority (int new_priority)
 {
   struct thread *t = thread_current();
 
+ /* Always sets the base priority to new_priority. */
   t->base_priority = new_priority;
 
   if (t->base_priority > t->effective_priority) {
 	  t->effective_priority = t->base_priority;
   }
 
+  /* Recalculate effective priority of thread based on the locks it is
+     holding. */
   thread_recalculate_effective_priority(t);
 
+  /* Check if we need to yield to let the new thread immediately
+   * start running. */
   if (!list_empty(&ready_list)) {
       struct thread *next_to_run =
-              list_entry(list_begin(&ready_list), struct thread, elem);
+              list_entry(list_rbegin(&ready_list), struct thread, elem);
       if (next_to_run->effective_priority > new_priority) {
           if (intr_context()) {
               intr_yield_on_return();
@@ -380,23 +385,23 @@ thread_donate_priority (struct thread *t, int priority) {
 
 	t->effective_priority = priority;
 
-	// If we change the priority, we need to reinsert the new priority in order.
+	/* If we change the priority of an element in an ordered list, we
+	 * need to remove that element and then reinsert it in the new correct
+	   position in the list, so that the list is still ordered. */
 
 	if (t->status == THREAD_BLOCKED) {
-		ASSERT (!list_empty (&t->waiting_on_sema->waiters));
+		ASSERT(!list_empty(&t->waiting_on_sema->waiters));
 
 		list_remove(&t->elem);
-		list_insert_ordered(&t->waiting_on_sema->waiters, &t->elem, higher_priority, NULL);
-		//list_sort(&t->waiting_on_sema->waiters, higher_priority, NULL);
+		list_insert_ordered(&t->waiting_on_sema->waiters, &t->elem,
+		    less_priority, NULL);
 	} else if (t->status == THREAD_READY) {
-		ASSERT (!list_empty (&ready_list));
+		ASSERT(!list_empty(&ready_list));
 
 		list_remove(&t->elem);
-		list_insert_ordered(&ready_list, &t->elem, higher_priority, NULL);
-
-		//list_sort(&ready_list, higher_priority, NULL);
+		list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
 	} else {
-		ASSERT (false);
+		ASSERT(false);
 	}
 
 	if (t->waiting_on_lock != NULL) {
@@ -405,29 +410,41 @@ thread_donate_priority (struct thread *t, int priority) {
 	}
 }
 
+/* Sets threads effective priority to the largest priority
+   out of the priorities of all locks that the thread is
+   holding. Priority of a lock is the largest out of the
+   priorities of its waiters. */
 void
 thread_recalculate_effective_priority(struct thread *t) {
 	int max = t->base_priority;
 	struct list_elem *e = NULL;
+
 	if (list_empty(&t->locks_holding)) {
 		t->effective_priority = t->base_priority;
 		return;
 	}
-	for (e = list_begin (&t->locks_holding); e != list_end (&t->locks_holding); e = list_next (e)) {
-		  struct lock *lock = list_entry (e, struct lock, lock_elem);
-		  if (!list_empty(&lock->semaphore.waiters)) {
-			  int local_max = list_entry(list_begin(&lock->semaphore.waiters),
-								  struct thread, elem)->effective_priority;
-			  if (local_max > max) {
-				  max = local_max;
-			  }
-		  }
+
+	/* Traverse through list of locks, locks_holding, setting max to
+	   the largest effective priority out of the effective priorities
+	   of all lock's waiters. */
+	for (e = list_begin(&t->locks_holding); e != list_end(&t->locks_holding);
+	    e = list_next(e)) {
+		struct lock *lock = list_entry(e, struct lock, lock_elem);
+		if (!list_empty(&lock->semaphore.waiters)) {
+		  int local_max = list_entry(list_rbegin(&lock->semaphore.waiters),
+								                 struct thread, elem)->effective_priority;
+			if (local_max > max) {
+			  max = local_max;
+			}
+		}
 	}
+
 	t->effective_priority = max;
 
 	if (thread_current()->effective_priority <
-			list_entry(list_begin(&ready_list), struct thread, elem)->effective_priority) {
-		thread_yield();
+			list_entry(list_rbegin(&ready_list),
+			           struct thread, elem)->effective_priority) {
+	  thread_yield();
 	}
 }
 
@@ -590,7 +607,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry(list_pop_front(&ready_list), struct thread, elem);
+    return list_entry(list_pop_back(&ready_list), struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page
