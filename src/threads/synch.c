@@ -61,7 +61,7 @@ less_priority(const struct list_elem *a, const struct list_elem *b,
   struct thread* thread_in_list = list_entry(b, struct thread, elem);
   int64_t b_priority =  thread_in_list->effective_priority;
 
-  return a_priority < b_priority;
+  return a_priority <= b_priority;
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -383,5 +383,5 @@ less_priority_sema(const struct list_elem *a UNUSED,
       list_entry(list_rbegin(&sema_in_list->semaphore.waiters),
 		  	  	  	  	  	  	struct thread, elem)->effective_priority;
 
-  return (int) aux < b_priority;
+  return (int) aux <= b_priority;
 }
