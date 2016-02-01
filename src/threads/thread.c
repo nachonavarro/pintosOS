@@ -481,18 +481,11 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice)
 {
-	struct thread *t = thread_current;
+	struct thread *t = thread_current();
   t->nice = nice;
-	int oldpri = thread_get_priority();
-	int newpri = thread_recalculate_bsd_priority(t);
-	if(newpri==oldpri){
-		return;
-	}else{
-		t->effective_priority=newpri;
-		if(newpri<oldpri){
-			thread_yield();
-			NOT_REACHED ();
-		}
+	thread_recalculate_bsd_priority(t);
+	if(highest_ready_priority()>thread_get_priority()){
+		thread_yield();
 	}
 }
 
