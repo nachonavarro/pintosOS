@@ -1,0 +1,104 @@
+\documentclass{article}
+
+\usepackage{fancyhdr} % Required for custom headers
+\usepackage{lastpage} % Required to determine the last page for the footer
+\usepackage{extramarks} % Required for headers and footers
+\usepackage[usenames,dvipsnames]{color} % Required for custom colors
+\usepackage{graphicx} % Required to insert images
+\usepackage{listings} % Required for insertion of code
+\usepackage{courier} % Required for the courier font
+\renewcommand{\_}{\char`_}
+
+% Margins
+\topmargin=-0.45in
+\evensidemargin=0in
+\oddsidemargin=0in
+\textwidth=6.5in
+\textheight=9.0in
+\headsep=0.25in
+
+\linespread{1.1} % Line spacing
+
+\lstset{language=C,
+                basicstyle=\ttfamily,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{Plum}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#}
+}
+
+
+% Set up the header and footer
+\pagestyle{fancy}
+\lhead{Group 18} % Top left header
+\chead{Task 0: Alarm Clock} % Top center head
+\rhead{\firstxmark} % Top right header
+\lfoot{\lastxmark} % Bottom left footer
+\rfoot{Page\ \thepage\ of\ \protect\pageref{LastPage}} % Bottom right footer
+\renewcommand\headrulewidth{0.4pt} % Size of the header rule
+\renewcommand\footrulewidth{0.4pt} % Size of the footer rule
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title{
+\vspace{2in}
+\textmd{\textbf{Task 1: Scheduling}}\\
+\normalsize\vspace{0.1in}\small{Due\ on\ Tuesday,\ February\ 9,\ 2016}\\
+\vspace{0.1in}\large{\textbf{Pintos Group 18}}
+\vspace{3in}
+}
+
+\author{Corentin Herbinet, Ignacio Navarro, Vinothan Shankar, William Springsteen}
+\date{}
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\maketitle
+\newpage
+
+\section{Design Questions: Priority Scheduling}
+\subsection{Data Structures}
+\subsubsection{Purpose of new variables}
+
+\subsubsection{Data structure used to track priority donation}
+
+\subsection{Algorithms}
+\subsubsection{Ensuring highest priority thread wakes up first}
+
+\subsubsection{Sequence of events in \texttt{lock\_acquire()}}
+
+\subsubsection{Sequence of events in \texttt{lock\_release()}}
+
+\subsection{Synchronization}
+\subsubsection{Potential race in \texttt{thread\_set\_priority()}}
+
+\subsection{Rationale}
+
+\subsubsection{Choice of design and superiority to other designs}
+
+\newpage
+
+\section{Design Questions: Advanced Scheduler}
+\subsection{Data Structures}
+\subsubsection{Purpose of new variables}
+
+\subsection{Algorithms}
+\subsubsection{Table}
+\subsection{Ambiguities in scheduler specification and resolution}
+\subsubsection{Dividing cost of scheduling}
+
+\subsection{Rationale}
+\subsubsection{Critique of design}
+
+\subsubsection{Design in fixed-point arithmetic}
+
+
+%----------------------------------------------------------------------------------------
+
+\end{document}
