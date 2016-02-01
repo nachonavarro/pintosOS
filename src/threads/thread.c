@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "fixed-point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -493,13 +494,13 @@ static void thread_recalculate_bsd_priority(struct thread *t)
 {
 	ASSERT (thread_mlfqs);
 
-	fixed_point new_priority=PRI_MAX;
-	priority = sub_fixed_points(newpriority,
+	fixed_point newpriority=PRI_MAX;
+	newpriority = sub_fixed_points(newpriority,
 	                            div_fixed_point_by_int(t->recent_cpu,
 	                                                   RECENTCPU_DIVISOR));
-	priority = sub_int_from_fixed_point(newpriority,(t->nice * NICE_COEFFICIENT));
+	newpriority = sub_int_from_fixed_point(newpriority,(t->nice * NICE_COEFFICIENT));
 
-  int priority = to_int_round_to_nearest(priority);
+  int priority = to_int_round_to_nearest(newpriority);
 	if(priority<PRI_MIN){
 		priority=PRI_MIN;
 	} else if(priority>PRI_MAX){
@@ -531,7 +532,7 @@ thread_get_load_avg (void)
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
-thread_get_recent_cpu (void) 
+thread_get_recent_cpu (void)
 {
   /* Not yet implemented. */
   return 0;
