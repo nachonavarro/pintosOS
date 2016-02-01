@@ -109,6 +109,9 @@ struct thread
     uint32_t *pagedir;                 /* Page directory. */
 #endif
 
+    /* Owned by thread.c; used for BSD scheduler */
+    int nice;
+
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };
