@@ -9,7 +9,7 @@
 /* Number of timer interrupts per second. */
 #define TIMER_FREQ 100
 
-/* ADDED List that will hold all threads that are waiting due to timer_sleep() */
+/* List that will hold all threads that are waiting due to timer_sleep() */
 struct list timer_waiting_threads;
 
 void timer_init (void);

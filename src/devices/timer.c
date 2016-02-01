@@ -29,6 +29,8 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
+static bool less_wake(const struct list_elem *a, const struct list_elem *b,
+    void *aux UNUSED);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -87,7 +89,6 @@ timer_elapsed (int64_t then)
 
 /* Returns true if ticks_to_wake_on of thread a is less than ticks_to_wake_on
    of thread b. */
-
 static bool
 less_wake(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
@@ -105,7 +106,6 @@ less_wake(const struct list_elem *a, const struct list_elem *b,
 void
 timer_sleep (int64_t ticks) 
 {
-
   /* Cannot sleep for 0 or less ticks (This wouldn't make sense). */
   if (ticks <= 0) {
       return;
@@ -114,18 +114,21 @@ timer_sleep (int64_t ticks)
   ASSERT (intr_get_level () == INTR_ON);
 
   enum intr_level old_level = intr_disable ();
+
   /* When ticks_to_wake_on ticks have passed (Since the OS booted), this
        thread can be woken. */
     int64_t ticks_to_wake_on = ticks + timer_ticks();
   struct thread* cur = thread_current();
   cur->ticks_to_wake_on = ticks_to_wake_on;
-  /* Insert the thread into a list of sleeping threads. */
-  list_insert_ordered(&timer_waiting_threads, &cur->sleep_elem, less_wake, NULL);
-  intr_set_level (old_level);
-  /* Causes the thread to wait until sema_up is called in timer_interrupt when the
-     thread is due to wake up, according to its ticks_to_wake_on member. */
-  sema_down(&cur->timer_wait_sema);
 
+  /* Insert the thread into a list of sleeping threads. */
+  list_insert_ordered(&timer_waiting_threads,
+      &cur->sleep_elem, less_wake, NULL);
+  intr_set_level (old_level);
+
+  /* Causes the thread to wait until sema_up is called in timer_interrupt when
+     the thread is due to wake up, according to its ticks_to_wake_on member. */
+  sema_down(&cur->timer_wait_sema);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -213,18 +216,22 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
       struct thread *waiting_thread =
         list_entry (e, struct thread, sleep_elem);
+
       /* Since the list is ordered, if we find a thread that isn't due to wake
          up, we can stop looking at threads further on in the list. */
       if (waiting_thread->ticks_to_wake_on > timer_ticks()) {
           break;
       }
+
       /* Removes the thread that is due to wake up (Traversal of list would
          have stopped if this thread was not due to wake up). */
       list_remove(e);
+
       /* Wakes up the sleeping thread.*/
       sema_up(&waiting_thread->timer_wait_sema);
   }
 }
+
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool

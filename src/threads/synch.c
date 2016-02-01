@@ -50,8 +50,10 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
+/* Returns true if effective priority of thread a
+   is less than effective priority of thread b. */
 bool
-higher_priority(const struct list_elem *a, const struct list_elem *b,
+less_priority(const struct list_elem *a, const struct list_elem *b,
             void *aux UNUSED) {
 
   struct thread* thread_to_insert = list_entry(a, struct thread, elem);
@@ -59,7 +61,7 @@ higher_priority(const struct list_elem *a, const struct list_elem *b,
   struct thread* thread_in_list = list_entry(b, struct thread, elem);
   int64_t b_priority =  thread_in_list->effective_priority;
 
-  return a_priority > b_priority;
+  return a_priority <= b_priority;
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -79,11 +81,11 @@ sema_down (struct semaphore *sema)
 
   old_level = intr_disable ();
   thread_current()->waiting_on_sema = sema;
-  while (sema->value == 0) 
-    {
-      list_insert_ordered(&sema->waiters, &thread_current()->elem, higher_priority, NULL);
-      thread_block();
-    }
+  while (sema->value == 0) {
+    list_insert_ordered(&sema->waiters,
+        &thread_current()->elem, less_priority, NULL);
+    thread_block();
+  }
   sema->value--;
   thread_current()->waiting_on_sema = NULL;
   intr_set_level (old_level);
@@ -129,7 +131,8 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
 
   if (!list_empty (&sema->waiters)) {
-    thread_unblock(list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+    thread_unblock(list_entry(list_pop_back(&sema->waiters),
+                              struct thread, elem));
   }
   sema->value++;
   thread_yield();
@@ -183,7 +186,7 @@ sema_test_helper (void *sema_)
    semaphore is twofold.  First, a semaphore can have a value
    greater than 1, but a lock can only be owned by a single
    thread at a time.  Second, a semaphore does not have an owner,
-   meaning that one thread can "down" the semaphore and thestruct threadn
+   meaning that one thread can "down" the semaphore and then
    another one "up" it, but with a lock the same thread must both
    acquire and release it.  When these restrictions prove
    onerous, it's a good sign that a semaphore should be used,
@@ -222,7 +225,6 @@ lock_acquire (struct lock *lock)
   thread_current()->waiting_on_lock = NULL;
   lock->holder = thread_current();
   list_push_back(&thread_current()->locks_holding, &lock->lock_elem);
-
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -261,7 +263,6 @@ lock_release (struct lock *lock)
   list_remove(&lock->lock_elem);
   thread_recalculate_effective_priority(thread_current());
   sema_up(&lock->semaphore);
-
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -324,7 +325,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered(&cond->waiters, &waiter.elem, higher_priority_sema, thread_current()->effective_priority);
+  list_insert_ordered(&cond->waiters, &waiter.elem,
+      less_priority_sema, thread_current()->effective_priority);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -344,9 +346,11 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+
+  if (!list_empty (&cond->waiters)) {
+    sema_up (&list_entry(list_pop_back(&cond->waiters),
+                         struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -365,12 +369,19 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
+/* Returns true if effective priority given as argument aux
+   is less than effective priority of semaphore b, which is
+   the highest priority of its waiters. This highest priority
+   element is at the end of the ordered list of waiters. */
 bool
-higher_priority_sema(const struct list_elem *a UNUSED, const struct list_elem *b, void *aux) {
+less_priority_sema(const struct list_elem *a UNUSED,
+    const struct list_elem *b, void *aux) {
 
-  struct semaphore_elem *sema_in_list = list_entry(b, struct semaphore_elem, elem);
-  int64_t b_priority = list_entry(list_begin(&sema_in_list->semaphore.waiters),
-		  	  	  	  	  	  	  	  	  	  struct thread, elem)->effective_priority;
+  struct semaphore_elem *sema_in_list =
+      list_entry(b, struct semaphore_elem, elem);
+  int64_t b_priority =
+      list_entry(list_rbegin(&sema_in_list->semaphore.waiters),
+		  	  	  	  	  	  	struct thread, elem)->effective_priority;
 
-  return (int) aux > b_priority;
+  return (int) aux <= b_priority;
 }

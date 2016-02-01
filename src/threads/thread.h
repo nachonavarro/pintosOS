@@ -84,20 +84,20 @@ typedef int tid_t;
 struct thread
   {
     /* Owned by thread.c. */
-    tid_t tid;                          /* Thread identifier. */
-    enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
-    uint8_t *stack;                     /* Saved stack pointer. */
-    int base_priority;                    /* Base priority. */
+    tid_t tid;                         /* Thread identifier. */
+    enum thread_status status;         /* Thread state. */
+    char name[16];                     /* Name (for debugging purposes). */
+    uint8_t *stack;                    /* Saved stack pointer. */
+    int base_priority;                 /* Base priority. */
     int effective_priority;
-    struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem allelem;          /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+    struct list_elem elem;             /* List element. */
 
-    struct semaphore timer_wait_sema;   /* Semaphore to make the thread wait. */
+    struct semaphore timer_wait_sema;  /* Semaphore to make the thread wait. */
 
-    struct list_elem sleep_elem;        /* list_elem for sleeping threads. */
+    struct list_elem sleep_elem;       /* list_elem for sleeping threads. */
     int64_t ticks_to_wake_on;
 
     struct list locks_holding;
@@ -106,11 +106,11 @@ struct thread
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+    uint32_t *pagedir;                 /* Page directory. */
 #endif
 
     /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
+    unsigned magic;                    /* Detects stack overflow. */
   };
 
 /* If false (default), use round-robin scheduler.
