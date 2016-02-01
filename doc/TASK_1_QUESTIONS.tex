@@ -66,6 +66,46 @@
 \subsection{Data Structures}
 \subsubsection{Purpose of new variables}
 
+\begin{enumerate}
+
+\item \begin{lstlisting}
+struct thread
+  {
+		.
+		.
+		.
+    struct list locks_holding;           /* List of locks that thread owns. */
+    struct lock *waiting_on_lock; 	 /* Lock the thread is waiting on. */ 
+    struct semaphore *waiting_on_sema;   /* Semaphore the thread is waiting on. */
+		.
+		.
+		.
+  };
+\end{lstlisting}
+
+\item \begin{lstlisting}
+struct lock 
+  {
+    struct thread *holder;       /* Thread holding lock (for debugging). */
+    struct list_elem lock_elem;  /* For the list of locks a thread has.  */
+    struct semaphore semaphore;  /* Binary semaphore controlling access. */
+  };
+\end{lstlisting}
+\end{enumerate}
+
+
+\begin{enumerate}
+
+\item We have modified \texttt{struct thread} by adding three new members. The first is a list of locks that the thread owns. This 
+is useful to modify the effective priority. The second is a pointer to a lock that the thread is waiting on. This pointer is \texttt{NULL}
+if the thread is not waiting on any lock. This member is useful to donate priority along the chain. The third is another pointer to a semaphore. This is used in the same manner as the second member but with semaphores, since a thread could be waiting on a semaphore but not on a lock.
+
+\item We have modified only one member in \texttt{struct lock}. This is a \texttt{list\_elem} for the list of locks a thread owns, as explained
+in the previous part.
+\end{enumerate}
+
+
+
 \subsubsection{Data structure used to track priority donation}
 
 \subsection{Algorithms}
