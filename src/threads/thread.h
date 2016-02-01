@@ -25,6 +25,12 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* BSD scheduler priority scaling factors */
+/* priority calculation includes "- recent_cpu / RECENTCPU_DIVISOR" */
+#define RECENTCPU_DIVISOR 4
+/* ...and "-nice*NICE_COEFFICIENT" */
+#define NICE_COEFFICIENT 2
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
