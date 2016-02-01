@@ -522,7 +522,7 @@ static void thread_recalculate_bsd_priority(struct thread *t)
 int
 thread_get_nice (void)
 {
-  return thread_current->nice;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
