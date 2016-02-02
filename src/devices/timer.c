@@ -253,7 +253,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
     }
 
     if (timer_ticks() % TIME_SLICE == 0) {
-      cur->effective_priority = thread_recalculate_bsd_priority();
+      thread_recalculate_bsd_priority(cur);
     }
 
   }
