@@ -250,7 +250,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
       fixed_point product = MUL_FIXED_POINTS(coefficient, recent_cpu);
 
       cur->recent_cpu = ADD_FIXED_POINTS(product, nice);
+    }
 
+    if (timer_ticks() % TIME_SLICE == 0) {
       cur->effective_priority = thread_recalculate_bsd_priority();
     }
 
