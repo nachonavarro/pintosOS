@@ -498,13 +498,25 @@ thread_recalculate_effective_priority(struct thread *t) {
 
 static int highest_ready_priority(void)
 {
+  /* In the advanced scheduler, we must find the highest priority non-empty
+     queue in the array of queues, and return this priority. Otherwise, we
+     can return the effective priority of the first thread in the ordered
+     ready list. */
+    //READY_LISTS_BSD IS ARRAY OF QUEUES
 	if (thread_mlfqs) {
-		return 0; /* FIXME: logic for mlfqs mode */
+    for (int i = PRI_MAX - PRI_MIN; i >= 0; i--) {
+      if (!list_empty(ready_lists_bsd[i])) {
+          return i + PRI_MIN;
+      }
+    }
+    /* If no threads are ready, return PRI_MIN. However, this function
+       should not really be called in the case of no threads being ready. */
+		return PRI_MIN;
 	} else {
 		return (list_entry(list_rbegin(&ready_list),
 		                   struct thread, elem)->effective_priority);
 	}
-	NOT_REACHED ();
+	NOT_REACHED();
 }
 
 /* Returns the current thread's priority. */
