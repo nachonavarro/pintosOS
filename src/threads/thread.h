@@ -130,6 +130,8 @@ extern bool thread_mlfqs;
 
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 
+fixed_point load_avg;
+
 void thread_init (void);
 void thread_start (void);
 
