@@ -75,8 +75,8 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-static void thread_recalculate_bsd_priority(struct thread *t);
 static int highest_ready_priority(void);
+
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -342,9 +342,6 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
-/* TODO: replace most calls of list_insert_ordered(&ready_list,...) with this
-   This will allow us to get BSD-style ready-flagging for free once it's
-   implemented.*/
 /* Add t to the relevant ready_list - if using priority scheduling,
    that's easy but it's a little more complex with 4.4BSD scheduling. */
 void add_to_ready_list(struct thread *t) {
@@ -414,8 +411,7 @@ thread_set_priority (int new_priority)
 
   /* Check if we need to yield to let the new thread immediately
    * start running. */
-	/* TODO: find a no-ready-threads condition in mlfqs mode */
-  if (!list_empty(&ready_list)) {
+	if (!list_empty(&ready_list)) {
       struct thread *next_to_run =
               list_entry(list_rbegin(&ready_list), struct thread, elem);
       if (next_to_run->effective_priority > new_priority) {
@@ -503,7 +499,7 @@ static int highest_ready_priority(void)
      ordered ready list. */
 	if (thread_mlfqs) {
     for (int i = PRI_MAX - PRI_MIN; i >= 0; i--) {
-      if (!list_empty(ready_lists_bsd[i])) {
+      if (!list_empty(&ready_lists_bsd[i])) {
           return i + PRI_MIN;
       }
     }
@@ -537,7 +533,7 @@ thread_set_nice (int nice)
 }
 
 /* Recalculates a thread's priority using its nice and recent_cpu parameters */
-static void 
+void
 thread_recalculate_bsd_priority (struct thread *t)
 {
 	ASSERT (thread_mlfqs);
@@ -582,7 +578,7 @@ thread_get_load_avg (void)
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void)
-{ 
+{
   fixed_point rcpu = MUL_INT_AND_FIXED_POINT(100, thread_current()->recent_cpu);
 	return TO_INT_ROUND_TO_NEAREST(rcpu);
 }
@@ -813,3 +809,8 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* returns true if t is the idle thread */
+bool is_idle_thread(struct thread *t){
+	return t==idle_thread;
+}

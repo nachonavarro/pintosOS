@@ -142,6 +142,13 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 void thread_block (void);
 void thread_unblock (struct thread *);
 
+bool is_idle_thread(struct thread *);
+
+int ready_thread_count(void);
+
+void thread_recalculate_bsd_priority(struct thread *t);
+
+
 struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);

@@ -251,7 +251,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
       cur->recent_cpu = ADD_FIXED_POINTS(product, nice);
 
-      cur->effective_priority = thread_recalculate_bsd_priority();
+      thread_recalculate_bsd_priority(cur);
     }
 
   }
