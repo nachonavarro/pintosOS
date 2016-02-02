@@ -319,6 +319,19 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
+/* TODO: replace most calls of list_insert_ordered(&ready_list,...) with this
+   This will allow us to get BSD-style ready-flagging for free once it's
+   implemented.*/
+/* Add t to the relevant ready_list - if using priority scheduling,
+   that's easy but it's a little more complex with 4.4BSD scheduling. */
+void add_to_ready_list(struct thread *t) {
+	if(thread_mlfqs){
+		/* TODO: Insert into the correct ready_list */
+	} else {
+		list_insert_ordered(&ready_list, t->elem, less_priority, NULL);
+	}
+}
+
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
