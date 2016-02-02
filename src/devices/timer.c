@@ -231,27 +231,34 @@ timer_interrupt (struct intr_frame *args UNUSED)
       sema_up(&waiting_thread->timer_wait_sema);
   }
 
-	struct thread * cur = thread_current();
-
+  /* Next if statement deals with updating BSD Scheduler specific data, such as
+     recent_cpu. */
   if (thread_mlfqs) {
+
+    struct thread * cur = thread_current();
 
     if (!is_idle_thread(cur)) {
       thread_current()->recent_cpu =
               ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
     }
 
+    /* Every second, for current thread,.. */
     if (timer_ticks() % TIMER_FREQ == 0) {
-      fixed_point load_avg = TO_FIXED_POINT(thread_get_load_avg());
-      fixed_point nice = TO_FIXED_POINT(thread_get_nice());
-      fixed_point recent_cpu = TO_FIXED_POINT(thread_get_recent_cpu()/100);
+      /* ...update load_avg... */
+      fixed_point load_avg_part =
+              MUL_FIXED_POINTS(LOAD_AVG_COEFFICIENT, load_avg);
+      /* 1 is added to ready_thread_count() to account for the currently
+         running thread. */
+      fixed_point ready_thread_count_part =
+              MUL_FIXED_POINTS(READY_THREAD_COUNT_COEFFICIENT,
+                      ready_thread_count() + 1);
+      load_avg = ADD_FIXED_POINTS(load_avg_part, ready_thread_count_part);
 
-      fixed_point coefficient = DIV_FIXED_POINTS(2*load_avg, 2*load_avg+1);
-
-      fixed_point product = MUL_FIXED_POINTS(coefficient, recent_cpu);
-
-      cur->recent_cpu = ADD_FIXED_POINTS(product, nice);
+      /* ...and update recent_cpu. */
+      thread_update_recent_cpu();
     }
 
+    /* Every 4 ticks, update priority of current thread. */
     if (timer_ticks() % TIME_SLICE == 0) {
       thread_recalculate_bsd_priority(cur);
     }

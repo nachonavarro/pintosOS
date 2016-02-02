@@ -102,6 +102,8 @@ thread_init (void)
 		for(int i = 0;i<(PRI_MAX-PRI_MIN);++i){
 			list_init(&ready_lists_bsd[i]);
 		}
+		/* load_avg set to 0 on OS boot. */
+		load_avg = 0;
 	} else{
 		list_init (&ready_list);
 	}
@@ -207,7 +209,9 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  /* Set a thread's nice and recent_cpu values to those of its parent */
+  /* Set a thread's nice and recent_cpu values to those of its parent.
+     Also sets the threads initial priority to the calculated BSD specific
+     priority. */
   if (thread_mlfqs) {
     t->nice = thread_get_nice();
     t->recent_cpu = thread_get_recent_cpu();
@@ -524,6 +528,8 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice)
 {
+  ASSERT (nice <= 20);
+  ASSERT (nice >= -20);
 	struct thread *t = thread_current();
   t->nice = nice;
 	thread_recalculate_bsd_priority(t);
@@ -540,12 +546,15 @@ thread_recalculate_bsd_priority (struct thread *t)
 
 	fixed_point newpriority = TO_FIXED_POINT(PRI_MAX);
 	newpriority = SUB_FIXED_POINTS(newpriority,
-	                               div_fixed_point_by_int(t->recent_cpu,
+	                               DIV_FIXED_POINT_BY_INT(t->recent_cpu,
 	                                                      RECENTCPU_DIVISOR));
 	newpriority = SUB_INT_FROM_FIXED_POINT(newpriority,
                                         (t->nice * NICE_COEFFICIENT));
 
   int priority = TO_INT_ROUND_ZERO(newpriority);
+
+  /* If priority calculated is invalid, it is rounded to the nearest valid
+     priority. */
 	if (priority < PRI_MIN) {
 		priority = PRI_MIN;
 	} else if (priority > PRI_MAX) {
@@ -587,19 +596,18 @@ thread_get_recent_cpu (void)
 	return TO_INT_ROUND_TO_NEAREST(rcpu);
 }
 
-//TODO: Make sure everything from mlfqs here is in header.
-
+/* Updates current thread's recent_cpu value. */
 void
 thread_update_recent_cpu(void) {
   struct thread *cur = thread_current();
   fixed_point lavg_part_numerator = MUL_INT_AND_FIXED_POINT(2, load_avg);
   fixed_point lavg_part_denominator = ADD_INT_AND_FIXED_POINT(1,
-          MUL_INT_AND_FIXED_POINT(2, load_avg));
+          lavg_part_numerator);
   fixed_point lavg_part_fraction = DIV_FIXED_POINTS(lavg_part_numerator,
           lavg_part_denominator);
   fixed_point rcpu = ADD_INT_AND_FIXED_POINT(thread_get_nice(),
           MUL_FIXED_POINTS(lavg_part_fraction,
-                  thread_get_recent_cpu()));
+                  cur->recent_cpu));
   cur->recent_cpu = rcpu;
 }
 
@@ -717,7 +725,7 @@ alloc_frame (struct thread *t, size_t size)
 }
 
 int ready_thread_count(void){
-	int c=0;
+	int c = 0;
 	for(int i=0; i<(PRI_MAX-PRI_MIN); ++i){
 		c+=list_size(&ready_lists_bsd[i]);
 	}
