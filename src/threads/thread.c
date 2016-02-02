@@ -56,7 +56,6 @@ static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
 /* Scheduling. */
-#define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
 /* If false (default), use round-robin scheduler.
@@ -499,10 +498,9 @@ thread_recalculate_effective_priority(struct thread *t) {
 static int highest_ready_priority(void)
 {
   /* In the advanced scheduler, we must find the highest priority non-empty
-     queue in the array of queues, and return this priority. Otherwise, we
-     can return the effective priority of the first thread in the ordered
-     ready list. */
-    //READY_LISTS_BSD IS ARRAY OF QUEUES
+     queue in the array of queues (ready_lists_bsd), and return this priority.
+     Otherwise, we can return the effective priority of the first thread in the
+     ordered ready list. */
 	if (thread_mlfqs) {
     for (int i = PRI_MAX - PRI_MIN; i >= 0; i--) {
       if (!list_empty(ready_lists_bsd[i])) {
@@ -544,18 +542,18 @@ thread_recalculate_bsd_priority (struct thread *t)
 {
 	ASSERT (thread_mlfqs);
 
-	fixed_point newpriority=PRI_MAX;
-	newpriority = sub_fixed_points(newpriority,
+	fixed_point newpriority = TO_FIXED_POINT(PRI_MAX);
+	newpriority = SUB_FIXED_POINTS(newpriority,
 	                               div_fixed_point_by_int(t->recent_cpu,
 	                                                      RECENTCPU_DIVISOR));
-	newpriority = sub_int_from_fixed_point(newpriority,
+	newpriority = SUB_INT_FROM_FIXED_POINT(newpriority,
                                         (t->nice * NICE_COEFFICIENT));
 
-  int priority = to_int_round_to_nearest(newpriority);
-	if (priority<PRI_MIN){
-		priority=PRI_MIN;
-	} else if(priority>PRI_MAX){
-		priority=PRI_MAX;
+  int priority = TO_INT_ROUND_ZERO(newpriority);
+	if (priority < PRI_MIN) {
+		priority = PRI_MIN;
+	} else if (priority > PRI_MAX) {
+		priority = PRI_MAX;
 	}
 
 	t->effective_priority = priority;
@@ -577,8 +575,8 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  fixed_point lavg = MUL_INT_AND_FIXED_POINT(100, load_avg);
+  return TO_INT_ROUND_TO_NEAREST(lavg);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -588,6 +586,16 @@ thread_get_recent_cpu (void)
   fixed_point rcpu = MUL_INT_AND_FIXED_POINT(100, thread_current()->recent_cpu);
 	return TO_INT_ROUND_TO_NEAREST(rcpu);
 }
+
+//TODO: Put these in headers.
+
+void
+thread_update_recent_cpu(void) {
+  struct thread *cur = thread_current();
+
+}
+
+
 
 /* Idle thread.  Executes when no other thread is ready to run.
 

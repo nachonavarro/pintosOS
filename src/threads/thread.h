@@ -128,6 +128,8 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+#define TIME_SLICE 4            /* # of timer ticks to give each thread. */
+
 void thread_init (void);
 void thread_start (void);
 

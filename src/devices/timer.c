@@ -234,19 +234,19 @@ timer_interrupt (struct intr_frame *args UNUSED)
   if (thread_mlfqs) {
 
     if (thread_current() != idle_thread) {
-      (thread_current()->recent_cpu)++;
+      thread_current()->recent_cpu =
+              ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
     }
-
     if (timer_ticks() % TIMER_FREQ == 0) {
-      fixed_point load_avg = to_fixed_point(thread_get_load_avg());
-      fixed_point nice = to_fixed_point(thread_get_nice());
-      fixed_point recent_cpu = to_fixed_point(thread_get_recent_cpu()/100);
+      fixed_point load_avg = TO_FIXED_POINT(thread_get_load_avg());
+      fixed_point nice = TO_FIXED_POINT(thread_get_nice());
+      fixed_point recent_cpu = TO_FIXED_POINT(thread_get_recent_cpu()/100);
 
-      fixed_point coefficient = div_fixed_points(2*load_avg, 2*load_avg+1);
+      fixed_point coefficient = DIV_FIXED_POINTS(2*load_avg, 2*load_avg+1);
 
-      fixed_point product = mul_fixed_points(coefficient, recent_cpu);
+      fixed_point product = MUL_FIXED_POINTS(coefficient, recent_cpu);
 
-      thread_current()->recent_cpu = add_fixed_points(product, nice);
+      thread_current()->recent_cpu = ADD_FIXED_POINTS(product, nice);
 
       thread_current()->effective_priority = thread_recalculate_priority_mlfqs();
     }
