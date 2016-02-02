@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "fixed-point.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -23,7 +24,10 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
+
+static struct list *ready_lists_bsd;
 static struct list ready_list;
+
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -94,7 +98,15 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
+  if(thread_mlfqs){
+		ready_lists_bsd = malloc((PRI_MAX+1 - PRI_MIN) * sizeof(struct list));
+		for(int i = 0;i<(PRI_MAX-PRI_MIN);++i){
+			list_init(&ready_lists_bsd[i]);
+		}
+	} else{
+		list_init (&ready_list);
+	}
+
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -271,7 +283,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
+  add_to_ready_list(t);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -356,7 +368,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-    list_insert_ordered(&ready_list, &cur->elem, less_priority, NULL);
+    add_to_ready_list(cur);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level (old_level);
@@ -403,6 +415,7 @@ thread_set_priority (int new_priority)
 
   /* Check if we need to yield to let the new thread immediately
    * start running. */
+	/* TODO: find a no-ready-threads condition in mlfqs mode */
   if (!list_empty(&ready_list)) {
       struct thread *next_to_run =
               list_entry(list_rbegin(&ready_list), struct thread, elem);
@@ -438,9 +451,7 @@ thread_donate_priority (struct thread *t, int priority) {
 		ASSERT(!list_empty(&ready_list));
 
 		list_remove(&t->elem);
-		list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
-	} else {
-		ASSERT(false);
+		add_to_ready_list(t);
 	}
 
 	if (t->waiting_on_lock != NULL) {
@@ -697,10 +708,15 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
-  if (list_empty (&ready_list))
-    return idle_thread;
-  else
-    return list_entry(list_pop_back(&ready_list), struct thread, elem);
+	if(thread_mlfqs){
+		/* TODO: implement me */
+	}else{
+		if (list_empty (&ready_list)){
+			return idle_thread;
+		} else {
+			return list_entry(list_pop_back(&ready_list), struct thread, elem);
+		}
+	}
 }
 
 /* Completes a thread switch by activating the new thread's page
