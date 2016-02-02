@@ -271,7 +271,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
+  add_to_ready_list(t);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -340,7 +340,7 @@ void add_to_ready_list(struct thread *t) {
 	if(thread_mlfqs){
 		/* TODO: Insert into the correct ready_list */
 	} else {
-		list_insert_ordered(&ready_list, t->elem, less_priority, NULL);
+		list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
 	}
 }
 
@@ -356,7 +356,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-    list_insert_ordered(&ready_list, &cur->elem, less_priority, NULL);
+    add_to_ready_list(cur);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level (old_level);
@@ -403,6 +403,7 @@ thread_set_priority (int new_priority)
 
   /* Check if we need to yield to let the new thread immediately
    * start running. */
+	/* TODO: find a no-ready-threads condition in mlfqs mode */
   if (!list_empty(&ready_list)) {
       struct thread *next_to_run =
               list_entry(list_rbegin(&ready_list), struct thread, elem);
@@ -438,9 +439,7 @@ thread_donate_priority (struct thread *t, int priority) {
 		ASSERT(!list_empty(&ready_list));
 
 		list_remove(&t->elem);
-		list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
-	} else {
-		ASSERT(false);
+		add_to_ready_list(t);
 	}
 
 	if (t->waiting_on_lock != NULL) {
@@ -682,10 +681,15 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
-  if (list_empty (&ready_list))
-    return idle_thread;
-  else
-    return list_entry(list_pop_back(&ready_list), struct thread, elem);
+	if(thread_mlfqs){
+		/* TODO: implement me */
+	}else{
+		if (list_empty (&ready_list)){
+			return idle_thread;
+		} else {
+			return list_entry(list_pop_back(&ready_list), struct thread, elem);
+		}
+	}
 }
 
 /* Completes a thread switch by activating the new thread's page
