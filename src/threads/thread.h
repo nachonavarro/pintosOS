@@ -111,14 +111,13 @@ struct thread
     struct lock *waiting_on_lock;
     struct semaphore *waiting_on_sema;
 
+    int nice;                          /* thread niceness value */
+    fixed_point recent_cpu;            /* CPU time recently received */
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                 /* Page directory. */
 #endif
-
-    /* Owned by thread.c; used for BSD scheduler */
-    int nice;
-		fixed_point recent_cpu;
 
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
