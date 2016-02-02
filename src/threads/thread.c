@@ -552,8 +552,12 @@ thread_recalculate_bsd_priority (struct thread *t)
 		priority = PRI_MAX;
 	}
 
-	t->effective_priority = priority;
-	/* TODO: move to appropriate ready queue */
+	if(priority != t->effective_priority){
+		t->effective_priority = priority;
+		/* if priority has changed we need to move t to a different ready queue */
+		list_remove(&t->elem);
+		add_to_ready_list(t);
+	}
 
 	if (thread_get_priority() < highest_ready_priority()) {
 	  thread_yield();
