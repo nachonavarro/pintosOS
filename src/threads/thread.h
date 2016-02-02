@@ -147,8 +147,6 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-int get_highest_effective_priority(struct thread *t);
-int get_highest_priority_waiting_threads(struct lock *lock);
 void thread_donate_priority (struct thread *t, int priority);
 void thread_recalculate_effective_priority(struct thread *t);
 
