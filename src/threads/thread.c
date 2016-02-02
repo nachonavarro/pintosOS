@@ -527,7 +527,7 @@ thread_set_nice (int nice)
 	struct thread *t = thread_current();
   t->nice = nice;
 	thread_recalculate_bsd_priority(t);
-	if(highest_ready_priority()>thread_get_priority()){
+	if(highest_ready_priority() > thread_get_priority()){
 		thread_yield();
 	}
 }
@@ -583,12 +583,20 @@ thread_get_recent_cpu (void)
 	return TO_INT_ROUND_TO_NEAREST(rcpu);
 }
 
-//TODO: Put these in headers.
+//TODO: Make sure everything from mlfqs here is in header.
 
 void
 thread_update_recent_cpu(void) {
   struct thread *cur = thread_current();
-
+  fixed_point lavg_part_numerator = MUL_INT_AND_FIXED_POINT(2, load_avg);
+  fixed_point lavg_part_denominator = ADD_INT_AND_FIXED_POINT(1,
+          MUL_INT_AND_FIXED_POINT(2, load_avg));
+  fixed_point lavg_part_fraction = DIV_FIXED_POINTS(lavg_part_numerator,
+          lavg_part_denominator);
+  fixed_point rcpu = ADD_INT_AND_FIXED_POINT(thread_get_nice(),
+          MUL_FIXED_POINTS(lavg_part_fraction,
+                  thread_get_recent_cpu()));
+  cur->recent_cpu = rcpu;
 }
 
 
