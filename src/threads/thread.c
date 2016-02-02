@@ -100,6 +100,14 @@ thread_init (void)
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
+
+
+  /* Set the initial thread's nice and recent_cpu to 0 */
+  if (thread_mlfqs) {
+    initial_thread->nice = 0;
+    initial_thread->recent_cpu = 0;
+  }
+
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -188,6 +196,15 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  /* Set a thread's nice and recent_cpu values to those of its parent */
+  if (thread_mlfqs) {
+    t->nice = thread_get_nice();
+    t->recent_cpu = thread_get_recent_cpu();
+    thread_recalculate_bsd_priority(t);
+    priority = t->effective_priority;
+  }
+
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -209,11 +226,6 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   intr_set_level (old_level);
-
-	if(thread_mlfqs){
-		thread_recalculate_bsd_priority(t);
-		priority = t->effective_priority;
-	}
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -328,7 +340,7 @@ void add_to_ready_list(struct thread *t) {
 	if(thread_mlfqs){
 		/* TODO: Insert into the correct ready_list */
 	} else {
-		list_insert_ordered(&ready_list, t->elem, less_priority, NULL);
+		list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
 	}
 }
 
@@ -475,7 +487,7 @@ thread_recalculate_effective_priority(struct thread *t) {
 
 static int highest_ready_priority(void)
 {
-	if(thread_mlfqs){
+	if (thread_mlfqs) {
 		return 0; /* FIXME: logic for mlfqs mode */
 	} else {
 		return (list_entry(list_rbegin(&ready_list),
@@ -488,10 +500,10 @@ static int highest_ready_priority(void)
 int
 thread_get_priority (void)
 {
-	return thread_current()->effective_priority;
+  return thread_current()->effective_priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
+/* Sets the current thread's nice value to NEW_NICE. */
 void
 thread_set_nice (int nice)
 {
@@ -503,18 +515,21 @@ thread_set_nice (int nice)
 	}
 }
 
-static void thread_recalculate_bsd_priority(struct thread *t)
+/* Recalculates a thread's priority using its nice and recent_cpu parameters */
+static void 
+thread_recalculate_bsd_priority (struct thread *t)
 {
 	ASSERT (thread_mlfqs);
 
 	fixed_point newpriority=PRI_MAX;
 	newpriority = sub_fixed_points(newpriority,
-	                            div_fixed_point_by_int(t->recent_cpu,
-	                                                   RECENTCPU_DIVISOR));
-	newpriority = sub_int_from_fixed_point(newpriority,(t->nice * NICE_COEFFICIENT));
+	                               div_fixed_point_by_int(t->recent_cpu,
+	                                                      RECENTCPU_DIVISOR));
+	newpriority = sub_int_from_fixed_point(newpriority,
+                                        (t->nice * NICE_COEFFICIENT));
 
   int priority = to_int_round_to_nearest(newpriority);
-	if(priority<PRI_MIN){
+	if (priority<PRI_MIN){
 		priority=PRI_MIN;
 	} else if(priority>PRI_MAX){
 		priority=PRI_MAX;
@@ -546,8 +561,8 @@ thread_get_load_avg (void)
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void)
-{
-  fixed_point rcpu = MUL_INT_AND_FIXED_POINT(thread_current()->recent_cpu,100);
+{ 
+  fixed_point rcpu = MUL_INT_AND_FIXED_POINT(100, thread_current()->recent_cpu);
 	return TO_INT_ROUND_TO_NEAREST(rcpu);
 }
 

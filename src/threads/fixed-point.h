@@ -19,7 +19,7 @@
 #define ADD_INT_AND_FIXED_POINT(n, x) ((x) + ((n) * F))
 #define SUB_INT_FROM_FIXED_POINT(x, n) ((x) - ((n) * F))
 #define MUL_FIXED_POINTS(x, y) ((((int64_t) (x)) * (y)) / F)
-#define MUL_INT_AND_FIXED_POINT(x, n) ((x) * (n))
+#define MUL_INT_AND_FIXED_POINT(n, x) ((n) * (x))
 #define DIV_FIXED_POINTS(x, y) ((((int64_t) (x)) * F) / (y))
 #define DIV_FIXED_POINT_BY_INT(x, n) ((x) / (n))
 
