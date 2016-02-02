@@ -534,8 +534,8 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  fixed_point rcpu = MUL_INT_AND_FIXED_POINT(thread_current()->recent_cpu,100);
+	return TO_INT_ROUND_TO_NEAREST(rcpu);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
