@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "fixed-point.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -23,7 +24,10 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
+
+static struct list *ready_lists_bsd;
 static struct list ready_list;
+
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -94,7 +98,15 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
+  if(thread_mlfqs){
+		ready_lists_bsd = malloc((PRI_MAX+1 - PRI_MIN) * sizeof(struct list));
+		for(int i = 0;i<(PRI_MAX-PRI_MIN);++i){
+			list_init(&ready_lists_bsd[i]);
+		}
+	} else{
+		list_init (&ready_list);
+	}
+
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
