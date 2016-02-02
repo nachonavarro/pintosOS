@@ -704,6 +704,14 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+int ready_thread_count(void){
+	int c=0;
+	for(int i=0; i<(PRI_MAX-PRI_MIN); ++i){
+		c+=list_size(&ready_lists_bsd[i]);
+	}
+	return c;
+}
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -713,7 +721,14 @@ static struct thread *
 next_thread_to_run (void)
 {
 	if(thread_mlfqs){
-		/* TODO: implement me */
+		if(ready_thread_count()>0) {
+			return
+				list_entry(list_pop_back(&ready_lists_bsd[highest_ready_priority()]),
+				           struct thread,
+				           elem);
+		} else {
+			 return idle_thread;
+		}
 	}else{
 		if (list_empty (&ready_list)){
 			return idle_thread;
