@@ -566,7 +566,8 @@ thread_recalculate_bsd_priority (struct thread *t)
 	if(priority != t->effective_priority){
 		t->effective_priority = priority;
 		/* if priority has changed we need to move t to a different ready queue */
-		list_remove(&t->elem);
+		if(t->elem.prev!=NULL && t->elem.next!=NULL)
+			list_remove(&t->elem);
 		add_to_ready_list(t);
 	}
 
