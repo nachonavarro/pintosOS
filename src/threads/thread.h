@@ -27,10 +27,14 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* BSD scheduler priority scaling factors */
-/* priority calculation includes "- recent_cpu / RECENTCPU_DIVISOR" */
+/* priority calculation includes "- recent_cpu / RECENTCPU_DIVISOR"... */
 #define RECENTCPU_DIVISOR 4
 /* ...and "-nice*NICE_COEFFICIENT" */
 #define NICE_COEFFICIENT 2
+/* These are fixed_point coefficients for load_avg calculation. */
+#define LOAD_AVG_COEFFICIENT DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(59), 60)
+#define READY_THREAD_COUNT_COEFFICIENT       \
+                              DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60)
 
 /* A kernel thread or user process.
 
@@ -172,9 +176,11 @@ void thread_set_priority (int);
    but in mlfqs there are more */
 void add_to_ready_list(struct thread *t);
 
+/* BSD Scheduler specific methods. */
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void thread_update_recent_cpu(void);
 
 #endif /* threads/thread.h */
