@@ -25,7 +25,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 
-static struct list *ready_lists_bsd;
+static struct list ready_lists_bsd[PRI_MAX+1-PRI_MIN];
 static struct list ready_list;
 
 
@@ -98,7 +98,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   if (thread_mlfqs) {
-		ready_lists_bsd = malloc((PRI_MAX+1 - PRI_MIN) * sizeof(struct list));
+		//ready_lists_bsd = malloc((PRI_MAX+1 - PRI_MIN) * sizeof(struct list));
 		int i;
 		for (i = 0; i < (PRI_MAX - PRI_MIN); ++i) {
 			list_init(&ready_lists_bsd[i]);
