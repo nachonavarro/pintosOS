@@ -97,9 +97,10 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  if(thread_mlfqs){
+  if (thread_mlfqs) {
 		ready_lists_bsd = malloc((PRI_MAX+1 - PRI_MIN) * sizeof(struct list));
-		for(int i = 0;i<(PRI_MAX-PRI_MIN);++i){
+		int i;
+		for (i = 0; i < (PRI_MAX - PRI_MIN); ++i) {
 			list_init(&ready_lists_bsd[i]);
 		}
 		/* load_avg set to 0 on OS boot. */
@@ -502,7 +503,8 @@ static int highest_ready_priority(void)
      Otherwise, we can return the effective priority of the first thread in the
      ordered ready list. */
 	if (thread_mlfqs) {
-    for (int i = PRI_MAX - PRI_MIN; i >= 0; i--) {
+	  int i;
+    for (i = PRI_MAX - PRI_MIN; i >= 0; i--) {
       if (!list_empty(&ready_lists_bsd[i])) {
           return i + PRI_MIN;
       }
@@ -726,7 +728,8 @@ alloc_frame (struct thread *t, size_t size)
 
 int ready_thread_count(void){
 	int c = 0;
-	for(int i=0; i<(PRI_MAX-PRI_MIN); ++i){
+	int i;
+	for (i = 0; i < (PRI_MAX - PRI_MIN); ++i){
 		c+=list_size(&ready_lists_bsd[i]);
 	}
 	return c;
