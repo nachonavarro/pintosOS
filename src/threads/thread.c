@@ -572,7 +572,8 @@ thread_recalculate_bsd_priority (struct thread *t)
 		add_to_ready_list(t);
 	}
 
-	if (thread_get_priority() < highest_ready_priority()) {
+	if ((ready_thread_count() > 0)
+			&& (thread_get_priority() < highest_ready_priority())) {
 	  thread_yield();
 	}
 }
