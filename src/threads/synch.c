@@ -136,7 +136,7 @@ sema_up (struct semaphore *sema)
     thread_unblock(to_unblock);
   }
   sema->value++;
-	if(to_unblock!=NULL && !intr_context){
+	if(to_unblock!=NULL && !intr_context()){
 		thread_yield ();
 	}
   intr_set_level (old_level);
