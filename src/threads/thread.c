@@ -25,7 +25,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 
-static struct list ready_lists_bsd[PRI_MAX+1-PRI_MIN];
+static struct list ready_lists_bsd[NUM_PRIORITIES];
 static struct list ready_list;
 
 
@@ -98,9 +98,8 @@ thread_init (void)
 
   lock_init (&tid_lock);
   if (thread_mlfqs) {
-		//ready_lists_bsd = malloc((PRI_MAX+1 - PRI_MIN) * sizeof(struct list));
 		int i;
-		for (i = 0; i < (PRI_MAX - PRI_MIN); ++i) {
+		for (i = 0; i < (NUM_PRIORITIES); ++i) {
 			list_init(&ready_lists_bsd[i]);
 		}
 		/* load_avg set to 0 on OS boot. */
@@ -351,7 +350,7 @@ thread_exit (void)
    that's easy but it's a little more complex with 4.4BSD scheduling. */
 void add_to_ready_list(struct thread *t) {
 	if(thread_mlfqs){
-		/* TODO: Insert into the correct ready_list */
+		list_push_front(&ready_lists_bsd[t->effective_priority-PRI_MIN], &t->elem);
 	} else {
 		list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
 	}
@@ -504,7 +503,7 @@ static int highest_ready_priority(void)
      ordered ready list. */
 	if (thread_mlfqs) {
 	  int i;
-    for (i = PRI_MAX - PRI_MIN; i >= 0; i--) {
+    for (i = NUM_PRIORITIES - 1; i >= 0; i--) {
       if (!list_empty(&ready_lists_bsd[i])) {
           return i + PRI_MIN;
       }
@@ -732,7 +731,7 @@ alloc_frame (struct thread *t, size_t size)
 int ready_thread_count(void){
 	int c = 0;
 	int i;
-	for (i = 0; i < (PRI_MAX - PRI_MIN); ++i){
+	for (i = 0; i < NUM_PRIORITIES; ++i){
 		c+=list_size(&ready_lists_bsd[i]);
 	}
 	return c;
