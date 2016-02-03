@@ -135,7 +135,9 @@ sema_up (struct semaphore *sema)
                               struct thread, elem));
   }
   sema->value++;
-  thread_yield();
+  if(thread_current()->status==THREAD_RUNNING && !intr_context()){
+		thread_yield();
+	}
   intr_set_level (old_level);
 }
 
