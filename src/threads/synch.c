@@ -124,6 +124,7 @@ sema_try_down (struct semaphore *sema)
 void
 sema_up (struct semaphore *sema)
 {
+	struct thread *to_unblock=NULL;
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
@@ -131,11 +132,13 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
 
   if (!list_empty (&sema->waiters)) {
-    thread_unblock(list_entry(list_pop_back(&sema->waiters),
-                              struct thread, elem));
+		to_unblock=list_entry(list_pop_back(&sema->waiters),struct thread,elem);
+    thread_unblock(to_unblock);
   }
   sema->value++;
-  thread_yield();
+	if(to_unblock!=NULL && !intr_context){
+		thread_yield ();
+	}
   intr_set_level (old_level);
 }
 
