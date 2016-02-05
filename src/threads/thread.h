@@ -153,25 +153,20 @@ void thread_unblock (struct thread *);
 
 bool is_idle_thread(struct thread *);
 
-int ready_thread_count(void);
-
-void thread_recalculate_bsd_priority(struct thread *t);
-
-
 struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+/* PART 1: Priority scheduling */
 void thread_donate_priority (struct thread *t, int priority);
 void thread_recalculate_effective_priority(struct thread *t);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
-
-int thread_get_priority (void);
 void thread_set_priority (int);
 
 /* Adds a thread to the appropriate ready-list */
@@ -179,11 +174,24 @@ void thread_set_priority (int);
    but in mlfqs there are more */
 void add_to_ready_list(struct thread *t);
 
-/* BSD Scheduler specific methods. */
+/* PART 2: BSD Scheduler. */
+
+/* Get, calculate, and update priority. */
+int thread_get_priority (void);
+int thread_calculate_bsd_priority(fixed_point recent_cpu, int nice);
+void thread_update_bsd_priority(struct thread *t, void *aux);
+
+/* Get, calculate, and update recent CPU. */
+int thread_get_recent_cpu (void);
+fixed_point thread_calculate_recent_cpu(fixed_point cpu, int nice);
+void thread_update_recent_cpu(struct thread *cur, void *aux);
+
+/* Get, calculate, and update load average. */
+int thread_get_load_avg (void);
+fixed_point thread_calculate_load_avg(fixed_point load);
+void thread_update_load_avg(void);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
-int thread_get_recent_cpu (void);
-int thread_get_load_avg (void);
-void thread_update_recent_cpu(void);
 
 #endif /* threads/thread.h */

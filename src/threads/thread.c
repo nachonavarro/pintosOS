@@ -11,8 +11,9 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "fixed-point.h"
+#include "threads/fixed-point.h"
 #include "threads/malloc.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -25,6 +26,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 
+/* Array of ready_lists depending on priority for BSD Scheduler */
 static struct list ready_lists_bsd[NUM_PRIORITIES];
 static struct list ready_list;
 
@@ -62,6 +64,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+static int num_of_ready_threads;
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -97,6 +100,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
+  /* Initialise the 64 queues */
   if (thread_mlfqs) {
 		int i;
 		for (i = 0; i < (NUM_PRIORITIES); ++i) {
@@ -104,7 +108,8 @@ thread_init (void)
 		}
 		/* load_avg set to 0 on OS boot. */
 		load_avg = 0;
-	} else{
+		num_of_ready_threads = 0;
+	} else {
 		list_init (&ready_list);
 	}
 
@@ -113,14 +118,6 @@ thread_init (void)
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
-
-
-  /* Set the initial thread's nice and recent_cpu to 0 */
-  if (thread_mlfqs) {
-    initial_thread->nice = 0;
-    initial_thread->recent_cpu = 0;
-  }
-
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -158,6 +155,32 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  /* Next if statement deals with updating BSD Scheduler specific data, such as
+     recent_cpu. */
+  if (thread_mlfqs) {
+    struct thread * cur = thread_current();
+
+    enum intr_level old_level = intr_disable ();
+
+    /* Increment recent_cpu by 1 except if the idle thread is running */
+	if (!is_idle_thread(cur)) {
+	  thread_current()->recent_cpu = ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
+
+	  /* Every second, for current thread,.. */
+	  if (timer_ticks() % TIMER_FREQ == 0) {
+		  thread_update_load_avg();
+      thread_foreach(thread_update_recent_cpu, NULL);
+	  }
+
+	  /* Every 4 ticks, update priority of current thread. */
+	  if (timer_ticks() % TIME_SLICE == 0) {
+		  thread_foreach(thread_update_bsd_priority, NULL);
+	  }
+	}
+	intr_set_level (old_level);
+
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -209,17 +232,6 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  /* Set a thread's nice and recent_cpu values to those of its parent.
-     Also sets the threads initial priority to the calculated BSD specific
-     priority. */
-  if (thread_mlfqs) {
-    t->nice = thread_get_nice();
-    t->recent_cpu = thread_get_recent_cpu();
-    thread_recalculate_bsd_priority(t);
-    priority = t->effective_priority;
-  }
-
-
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -246,7 +258,7 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   /* Yield if new thread's priority is higher */
-  if (thread_get_priority() < priority) {
+  if (thread_get_priority() < t->effective_priority) {
 	  thread_yield();
   }
 
@@ -264,6 +276,10 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
+
+  if (thread_mlfqs && strcmp("idle", thread_current()->name)) {
+	  num_of_ready_threads--;
+  }
 
   thread_current()->status = THREAD_BLOCKED;
   schedule();
@@ -286,6 +302,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
+  if (thread_mlfqs)
+	  num_of_ready_threads++;
   add_to_ready_list(t);
 
   t->status = THREAD_READY;
@@ -332,6 +350,8 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
+
+
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -340,6 +360,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+  if (thread_mlfqs)
+	  num_of_ready_threads--;
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -495,6 +517,142 @@ thread_recalculate_effective_priority(struct thread *t) {
 	}
 }
 
+////////////////////////////////////////////////
+// BSD SCHEDULER FUNCTIONS: ///////////////////
+//////////////////////////////////////////////
+//////////////////////////////////////////////
+
+/* Sets the current thread's nice value to NEW_NICE. */
+void
+thread_set_nice (int nice)
+{
+  ASSERT (nice <= 20);
+  ASSERT (nice >= -20);
+	struct thread *t = thread_current();
+	t->nice = nice;
+	thread_update_bsd_priority(t, NULL);
+}
+
+/* Returns the current thread's nice value. */
+int
+thread_get_nice (void)
+{
+  return thread_current()->nice;
+}
+
+/* Returns the current thread's priority. */
+int
+thread_get_priority (void)
+{
+  return thread_current()->effective_priority;
+}
+
+
+/* Applies the formula: priority = PRI_MAX - (recent_cpu / 4) - (nice * 2). */
+int
+thread_calculate_bsd_priority(fixed_point recent_cpu, int nice)
+{
+	int effective_priority;
+    fixed_point cpu_term  = DIV_FIXED_POINT_BY_INT(recent_cpu, RECENTCPU_DIVISOR);
+    int nice_term = nice * NICE_COEFFICIENT;
+    effective_priority = PRI_MAX - TO_INT_ROUND_ZERO(cpu_term) - nice_term;
+    /* If priority calculated is invalid, it is rounded to the nearest valid
+       priority. */
+  	if (effective_priority < PRI_MIN) {
+  		effective_priority = PRI_MIN;
+  	} else if (effective_priority > PRI_MAX) {
+  		effective_priority = PRI_MAX;
+  	}
+  	return effective_priority;
+}
+
+/* Recalculates a thread's priority using its nice and recent_cpu parameters */
+void
+thread_update_bsd_priority (struct thread *t, void *aux UNUSED)
+{
+	ASSERT (thread_mlfqs);
+
+  t->effective_priority = thread_calculate_bsd_priority(t->recent_cpu, t->nice);
+
+  if (t != idle_thread && t->status == THREAD_READY) {
+    enum intr_level old_level = intr_disable();
+    list_remove(&t->elem);
+    add_to_ready_list(t);
+    intr_set_level(old_level);
+  }
+
+  if (thread_get_priority() < highest_ready_priority()) {
+	 if (!intr_context()){
+		 thread_yield();
+	 } else {
+		 intr_yield_on_return();
+	 }
+  }
+}
+
+/* Returns 100 times the current thread's recent_cpu value. */
+int
+thread_get_recent_cpu (void)
+{
+  fixed_point rcpu = MUL_INT_AND_FIXED_POINT(100, thread_current()->recent_cpu);
+	return TO_INT_ROUND_TO_NEAREST(rcpu);
+}
+
+/* Applies the formula: recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice  */
+fixed_point
+thread_calculate_recent_cpu(fixed_point recent_cpu, int thread_nice) {
+
+    fixed_point lavg_part_numerator = MUL_INT_AND_FIXED_POINT(2, load_avg);
+    fixed_point lavg_part_denominator = ADD_INT_AND_FIXED_POINT(1,
+            lavg_part_numerator);
+    fixed_point lavg_part_fraction = DIV_FIXED_POINTS(lavg_part_numerator,
+            lavg_part_denominator);
+    fixed_point lavg_cpu_mult = MUL_FIXED_POINTS(lavg_part_fraction, recent_cpu);
+    fixed_point rcpu = ADD_INT_AND_FIXED_POINT(thread_nice, lavg_cpu_mult);
+    return rcpu;
+}
+
+/* Updates current thread's recent_cpu value. */
+void
+thread_update_recent_cpu(struct thread *cur, void *aux UNUSED) {
+ 
+  if (cur != idle_thread) {
+	  enum intr_level old_level = intr_disable ();
+	  cur->recent_cpu = thread_calculate_recent_cpu(cur->recent_cpu, cur->nice);
+	  intr_set_level (old_level);
+  }
+}
+
+/* Returns 100 times the system load average. */
+int
+thread_get_load_avg (void)
+{
+  fixed_point lavg = MUL_INT_AND_FIXED_POINT(100, load_avg);
+  printf("Load average: %d\n", load_avg);
+  printf("Load average rounded: %d\n",TO_INT_ROUND_TO_NEAREST(lavg));
+  printf("Number of ready_threads: %d\n", num_of_ready_threads);
+  return TO_INT_ROUND_TO_NEAREST(lavg);
+}
+
+/* Applies the formula: load_avg = (59/60)*load_avg + (1/60)*ready_threads */
+fixed_point
+thread_calculate_load_avg(fixed_point load)
+{
+  ASSERT(intr_get_level() == INTR_OFF);
+	fixed_point load_part  = DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(59), 60);
+	fixed_point ready_part = DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60);
+	load  = MUL_FIXED_POINTS(load_part, load) +  MUL_INT_AND_FIXED_POINT(num_of_ready_threads, ready_part);
+	return load;
+}
+
+void
+thread_update_load_avg(void)
+{
+	  enum intr_level old_level = intr_disable ();
+	  load_avg = thread_calculate_load_avg(load_avg);
+	  intr_set_level (old_level);
+}
+
 static int highest_ready_priority(void)
 {
   /* In the advanced scheduler, we must find the highest priority non-empty
@@ -510,109 +668,13 @@ static int highest_ready_priority(void)
     }
     /* If no threads are ready, return PRI_MIN. However, this function
        should not really be called in the case of no threads being ready. */
-		return PRI_MIN;
+		return -1;
 	} else {
 		return (list_entry(list_rbegin(&ready_list),
 		                   struct thread, elem)->effective_priority);
 	}
 	NOT_REACHED();
-}
-
-/* Returns the current thread's priority. */
-int
-thread_get_priority (void)
-{
-  return thread_current()->effective_priority;
-}
-
-/* Sets the current thread's nice value to NEW_NICE. */
-void
-thread_set_nice (int nice)
-{
-  ASSERT (nice <= 20);
-  ASSERT (nice >= -20);
-	struct thread *t = thread_current();
-  t->nice = nice;
-	thread_recalculate_bsd_priority(t);
-	if(highest_ready_priority() > thread_get_priority()){
-		thread_yield();
-	}
-}
-
-/* Recalculates a thread's priority using its nice and recent_cpu parameters */
-void
-thread_recalculate_bsd_priority (struct thread *t)
-{
-	ASSERT (thread_mlfqs);
-
-	fixed_point newpriority = TO_FIXED_POINT(PRI_MAX);
-	newpriority = SUB_FIXED_POINTS(newpriority,
-	                               DIV_FIXED_POINT_BY_INT(t->recent_cpu,
-	                                                      RECENTCPU_DIVISOR));
-	newpriority = SUB_INT_FROM_FIXED_POINT(newpriority,
-                                        (t->nice * NICE_COEFFICIENT));
-
-  int priority = TO_INT_ROUND_ZERO(newpriority);
-
-  /* If priority calculated is invalid, it is rounded to the nearest valid
-     priority. */
-	if (priority < PRI_MIN) {
-		priority = PRI_MIN;
-	} else if (priority > PRI_MAX) {
-		priority = PRI_MAX;
-	}
-
-	if(priority != t->effective_priority){
-		t->effective_priority = priority;
-		/* If priority has changed we need to move t to a different ready queue */
-		if(t->elem.prev!=NULL && t->elem.next!=NULL) {
-			list_remove(&t->elem);
-		}
-		add_to_ready_list(t);
-	}
-
-	if ((ready_thread_count() > 0)
-			&& (thread_get_priority() < highest_ready_priority())) {
-	  thread_yield();
-	}
-}
-
-/* Returns the current thread's nice value. */
-int
-thread_get_nice (void)
-{
-  return thread_current()->nice;
-}
-
-/* Returns 100 times the system load average. */
-int
-thread_get_load_avg (void)
-{
-  fixed_point lavg = MUL_INT_AND_FIXED_POINT(100, load_avg);
-  return TO_INT_ROUND_TO_NEAREST(lavg);
-}
-
-/* Returns 100 times the current thread's recent_cpu value. */
-int
-thread_get_recent_cpu (void)
-{
-  fixed_point rcpu = MUL_INT_AND_FIXED_POINT(100, thread_current()->recent_cpu);
-	return TO_INT_ROUND_TO_NEAREST(rcpu);
-}
-
-/* Updates current thread's recent_cpu value. */
-void
-thread_update_recent_cpu(void) {
-  struct thread *cur = thread_current();
-  fixed_point lavg_part_numerator = MUL_INT_AND_FIXED_POINT(2, load_avg);
-  fixed_point lavg_part_denominator = ADD_INT_AND_FIXED_POINT(1,
-          lavg_part_numerator);
-  fixed_point lavg_part_fraction = DIV_FIXED_POINTS(lavg_part_numerator,
-          lavg_part_denominator);
-  fixed_point rcpu = ADD_INT_AND_FIXED_POINT(thread_get_nice(),
-          MUL_FIXED_POINTS(lavg_part_fraction,
-                  cur->recent_cpu));
-  cur->recent_cpu = rcpu;
+	return -1;
 }
 
 
@@ -710,6 +772,17 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->timer_wait_sema, 0);
   t->magic = THREAD_MAGIC;
 
+  if (thread_mlfqs) {
+    if (!strcmp("main", name)) {
+      t->nice = 0;
+      t->recent_cpu = 0;
+    } else {
+      /* Inherit parent's niceness and recent CPU */
+      t->nice = thread_get_nice();
+      t->recent_cpu = thread_current()->recent_cpu;
+    }
+  }
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -728,15 +801,6 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
-int ready_thread_count(void){
-	int c = 0;
-	int i;
-	for (i = 0; i < NUM_PRIORITIES; ++i){
-		c+=list_size(&ready_lists_bsd[i]);
-	}
-	return c;
-}
-
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -746,15 +810,14 @@ static struct thread *
 next_thread_to_run (void)
 {
 	if(thread_mlfqs){
-		if(ready_thread_count()>0) {
-			return
-				list_entry(list_pop_back(&ready_lists_bsd[highest_ready_priority()]),
-				           struct thread,
-				           elem);
+		int highest_priority = highest_ready_priority();
+		if(highest_priority >= 0) {
+			return list_entry(list_pop_back(&ready_lists_bsd[highest_priority]),
+				                                                     struct thread, elem);
 		} else {
 			 return idle_thread;
 		}
-	}else{
+	} else {
 		if (list_empty (&ready_list)){
 			return idle_thread;
 		} else {
