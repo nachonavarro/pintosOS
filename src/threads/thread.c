@@ -161,10 +161,8 @@ thread_tick (void)
   if (thread_mlfqs) {
     struct thread * cur = thread_current();
 
-    enum intr_level old_level = intr_disable ();
-
     /* Increment recent_cpu by 1 except if the idle thread is running */
-	if (!is_idle_thread(cur)) {
+	if (!is_idle_thread(cur)) 
 	  thread_current()->recent_cpu = ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
 
 	  /* Every second, for current thread,.. */
@@ -177,8 +175,6 @@ thread_tick (void)
 	  if (timer_ticks() % TIME_SLICE == 0) {
 		  thread_foreach(thread_update_bsd_priority, NULL);
 	  }
-	}
-	intr_set_level (old_level);
 
   }
 
