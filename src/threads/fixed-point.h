@@ -3,13 +3,17 @@
 
 #include <stdint.h>
 
-/* We are using a P.Q fixed-point format. */
+/* We are using a P.Q fixed-point format. P + Q must equal 31. */
 #define P 17
 #define Q 14
 #define F (1 << (Q))
 
 typedef int32_t fixed_point;
 
+/* Operations for fixed-point arithmetic.
+   Function names describe exactly what the function returns.
+   In the arguments, n always represents an int, and x and y
+   always represent fixed-point numbers. */
 fixed_point TO_FIXED_POINT(int n);
 int TO_INT_ROUND_ZERO(fixed_point x);
 int TO_INT_ROUND_TO_NEAREST(fixed_point x);

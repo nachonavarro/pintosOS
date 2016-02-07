@@ -24,7 +24,9 @@
 #define THREAD_MAGIC 0xcd6abf4b
 
 /* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
+   that are ready to run but not actually running.
+   In mlfqs mode, ready_lists_bsd does this, otherwise ready_list
+   will do this this. */
 
 /* Array of ready_lists depending on priority for BSD Scheduler */
 static struct list ready_lists_bsd[NUM_PRIORITIES];
@@ -58,13 +60,13 @@ static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
 /* Scheduling. */
+#define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
-static int num_of_ready_threads;
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -79,6 +81,7 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 static int highest_ready_priority(void);
+static int num_of_ready_threads;
 
 
 /* Initializes the threading system by transforming the code
@@ -108,6 +111,7 @@ thread_init (void)
 		}
 		/* load_avg set to 0 on OS boot. */
 		load_avg = 0;
+		/* Number of ready threads is set to 0 on boot as well. */
 		num_of_ready_threads = 0;
 	} else {
 		list_init (&ready_list);
@@ -165,7 +169,7 @@ thread_tick (void)
 	if (!is_idle_thread(cur)) 
 	  thread_current()->recent_cpu = ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
 
-	  /* Every second, for current thread,.. */
+	  /* Every second, for current thread, update load_avg and recent_cpu. */
 	  if (timer_ticks() % TIMER_FREQ == 0) {
 		  thread_update_load_avg();
       thread_foreach(thread_update_recent_cpu, NULL);
@@ -298,8 +302,9 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  if (thread_mlfqs)
+  if (thread_mlfqs) {
 	  num_of_ready_threads++;
+  }
   add_to_ready_list(t);
 
   t->status = THREAD_READY;
@@ -356,8 +361,9 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  if (thread_mlfqs)
+  if (thread_mlfqs) {
 	  num_of_ready_threads--;
+  }
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -385,8 +391,9 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread)
+  if (cur != idle_thread) {
     add_to_ready_list(cur);
+  }
   cur->status = THREAD_READY;
   schedule();
   intr_set_level (old_level);
@@ -423,6 +430,10 @@ thread_set_priority (int new_priority)
  /* Always sets the base priority to new_priority. */
   t->base_priority = new_priority;
 
+  /* If base_priority i now larger than the threads effective priority,
+     its effective priority can now be changed to be equal to the base
+     priority, as effective priority is the maximum of base priority
+     and donated priorities. */
   if (t->base_priority > t->effective_priority) {
 	  t->effective_priority = t->base_priority;
   }
@@ -471,6 +482,8 @@ thread_donate_priority (struct thread *t, int priority) {
 		add_to_ready_list(t);
 	}
 
+	/* If the thread we are donating to is also waiting on a lock, we can
+	   donate the priority to the other locks holder as well. */
 	if (t->waiting_on_lock != NULL) {
 		ASSERT(&t->waiting_on_lock->holder != NULL);
 		thread_donate_priority(t->waiting_on_lock->holder, priority);
@@ -526,6 +539,7 @@ thread_set_nice (int nice)
   ASSERT (nice >= -20);
 	struct thread *t = thread_current();
 	t->nice = nice;
+	/* Must update a threads priority when setting its nice value. */
 	thread_update_bsd_priority(t, NULL);
 }
 
@@ -570,6 +584,8 @@ thread_update_bsd_priority (struct thread *t, void *aux UNUSED)
 
   t->effective_priority = thread_calculate_bsd_priority(t->recent_cpu, t->nice);
 
+  /* If a threads priority changes in mlfqs mode, we need to move it
+     to a different priority queue in ready_lists_bsd. */
   if (t != idle_thread && t->status == THREAD_READY) {
     enum intr_level old_level = intr_disable();
     list_remove(&t->elem);
@@ -649,6 +665,7 @@ thread_update_load_avg(void)
 	  intr_set_level (old_level);
 }
 
+/* Returns highest priority out of all threads that are ready. */
 static int highest_ready_priority(void)
 {
   /* In the advanced scheduler, we must find the highest priority non-empty
@@ -662,7 +679,7 @@ static int highest_ready_priority(void)
           return i + PRI_MIN;
       }
     }
-    /* If no threads are ready, return PRI_MIN. However, this function
+    /* If no threads are ready, return -1. However, this function
        should not really be called in the case of no threads being ready. */
 		return -1;
 	} else {
@@ -769,6 +786,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   if (thread_mlfqs) {
+    /* Set initial threads niceness and recent_cpu to 0. */
     if (!strcmp("main", name)) {
       t->nice = 0;
       t->recent_cpu = 0;
@@ -909,7 +927,8 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/* returns true if t is the idle thread */
-bool is_idle_thread(struct thread *t){
+/* Returns true if t is the idle thread */
+bool
+is_idle_thread(struct thread *t){
 	return t==idle_thread;
 }

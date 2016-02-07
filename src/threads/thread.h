@@ -114,11 +114,12 @@ struct thread
     struct list_elem sleep_elem;       /* list_elem for sleeping threads. */
     int64_t ticks_to_wake_on;
 
-    struct list locks_holding;
-    struct lock *waiting_on_lock;
-    struct semaphore *waiting_on_sema;
+    struct list locks_holding;  /* List of locks that the thread is holding. */
+    struct lock *waiting_on_lock;         /* Lock that thread is waiting on. */
+    struct semaphore *waiting_on_sema;    /* Semaphore that thread
+                                             is waiting on. */
 
-    int nice;                          /* thread niceness value */
+    int nice;                          /* Thread niceness value */
     fixed_point recent_cpu;            /* CPU time recently received */
 
 #ifdef USERPROG
@@ -135,9 +136,7 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-#define TIME_SLICE 4            /* # of timer ticks to give each thread. */
-
-fixed_point load_avg;
+fixed_point load_avg;                  /* System-wide load_avg variable. */
 
 void thread_init (void);
 void thread_start (void);
