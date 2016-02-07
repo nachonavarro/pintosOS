@@ -220,13 +220,19 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   if (lock->holder != NULL) {
+    /* This thread is set to be waiting for the lock to be released, as another
+       thread is already holding this lock. */
 	  thread_current()->waiting_on_lock = lock;
+	  /* Donate the current threads priority to the thread holding the lock, so
+	     that the holding thread can hopefully run with its higher priority,
+	     and release the lock, so that this thread can acquire the lock. */
 	  thread_donate_priority(lock->holder, thread_current()->effective_priority);
   }
 
   sema_down (&lock->semaphore);
   thread_current()->waiting_on_lock = NULL;
   lock->holder = thread_current();
+  /* Add this lock to the list of locks that the current thread is holding. */
   list_push_back(&thread_current()->locks_holding, &lock->lock_elem);
 }
 
@@ -263,7 +269,11 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
+  /* Remove this lock from the list of locks that its holder was holding. */
   list_remove(&lock->lock_elem);
+  /* The current thread needs to have its effective priority recalculated
+     now, as any effects of priority donation to the lock holder can
+     be undone. */
   thread_recalculate_effective_priority(thread_current());
   sema_up(&lock->semaphore);
 }
