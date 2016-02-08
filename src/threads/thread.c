@@ -32,6 +32,9 @@
 static struct list ready_lists_bsd[NUM_PRIORITIES];
 static struct list ready_list;
 
+/* Simply the number of threads in ready_lists_bsd.
+   Needed to calculate load_avg. Only used in mlfqs mode. */
+static int num_of_ready_threads;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -81,7 +84,6 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 static int highest_ready_priority(void);
-static int num_of_ready_threads;
 
 
 /* Initializes the threading system by transforming the code
@@ -163,7 +165,7 @@ thread_tick (void)
   /* Next if statement deals with updating BSD Scheduler specific data, such as
      recent_cpu. */
   if (thread_mlfqs) {
-    struct thread * cur = thread_current();
+    struct thread *cur = thread_current();
 
     /* Increment recent_cpu by 1 except if the idle thread is running */
 	if (!is_idle_thread(cur)) 
@@ -443,7 +445,7 @@ thread_set_priority (int new_priority)
   thread_recalculate_effective_priority(t);
 
   /* Check if we need to yield to let the new thread immediately
-   * start running. */
+     start running. */
 	if (!list_empty(&ready_list)) {
       struct thread *next_to_run =
               list_entry(list_rbegin(&ready_list), struct thread, elem);
@@ -466,7 +468,7 @@ thread_donate_priority (struct thread *t, int priority) {
 	t->effective_priority = priority;
 
 	/* If we change the priority of an element in an ordered list, we
-	 * need to remove that element and then reinsert it in the new correct
+	   need to remove that element and then reinsert it in the new correct
 	   position in the list, so that the list is still ordered. */
 
 	if (t->status == THREAD_BLOCKED) {
