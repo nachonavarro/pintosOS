@@ -130,7 +130,7 @@ sema_try_down (struct semaphore *sema)
 void
 sema_up (struct semaphore *sema)
 {
-	struct thread *to_unblock=NULL;
+  struct thread *to_unblock=NULL;
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
@@ -138,15 +138,15 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
 
   if (!list_empty (&sema->waiters)) {
-		to_unblock=list_entry(list_pop_back(&sema->waiters),struct thread,elem);
+    to_unblock=list_entry(list_pop_back(&sema->waiters),struct thread,elem);
     thread_unblock(to_unblock);
   }
 
   sema->value++;
 
-	if (to_unblock!=NULL && !intr_context()) {
-		thread_yield ();
-	}
+  if (to_unblock!=NULL && !intr_context()) {
+    thread_yield ();
+  }
 
   intr_set_level (old_level);
 }
@@ -230,11 +230,11 @@ lock_acquire (struct lock *lock)
   if (lock->holder != NULL) {
     /* This thread is set to be waiting for the lock to be released, as another
        thread is already holding this lock. */
-	  thread_current()->waiting_on_lock = lock;
-	  /* Donate the current threads priority to the thread holding the lock, so
-	     that the holding thread can hopefully run with its higher priority,
-	     and release the lock, so that this thread can acquire the lock. */
-	  thread_donate_priority(lock->holder, thread_current()->effective_priority);
+    thread_current()->waiting_on_lock = lock;
+    /* Donate the current threads priority to the thread holding the lock, so
+       that the holding thread can hopefully run with its higher priority,
+       and release the lock, so that this thread can acquire the lock. */
+    thread_donate_priority(lock->holder, thread_current()->effective_priority);
   }
 
   sema_down (&lock->semaphore);
@@ -260,7 +260,7 @@ lock_try_acquire (struct lock *lock)
 
   success = sema_try_down (&lock->semaphore);
   if (success) {
-	  lock->holder = thread_current();
+    lock->holder = thread_current();
   }
   return success;
 }
@@ -405,7 +405,7 @@ less_priority_sema(const struct list_elem *a UNUSED,
     = list_entry(b, struct semaphore_elem, elem);
   int64_t b_priority 
     = list_entry(list_rbegin(&sema_in_list->semaphore.waiters),
-		  	  	  	  	  	  	struct thread, elem)->effective_priority;
+                            struct thread, elem)->effective_priority;
 
   return *(int*)aux <= b_priority;
 }

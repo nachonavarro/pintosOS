@@ -397,6 +397,8 @@ fixed_point load_avg;                  /* System-wide load_avg variable. */
 
 \subsubsection{Design in fixed-point arithmetic}
 
+We have chosen to use macros as an abstraction layer for fixed-point mathematics as we believe it is the most efficient way to do arithmetic with fixed-point numbers. The other option would have been to create functions that would have been called when we needed to use a fixed-point number in a mathematical operation. However, as the preprocessor directly substitutes the macros into the program, macros require more memory space but less time to be called than a function. As speed and efficiency are the prime objectives when calculating thread priority and CPU usage time, we have chosen to use macros.
+Macros do not allow type checking, therefore it is important to check the type of the arguments given to the macros if errors want to be avoided.
 
 %----------------------------------------------------------------------------------------
 
