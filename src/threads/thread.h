@@ -103,7 +103,7 @@ struct thread
     char name[16];                     /* Name (for debugging purposes). */
     uint8_t *stack;                    /* Saved stack pointer. */
     int base_priority;                 /* Base priority. */
-    int effective_priority;
+    int effective_priority;          /* Used in both default and mlfqs mode. */
     struct list_elem allelem;          /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
