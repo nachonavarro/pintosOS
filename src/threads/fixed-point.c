@@ -1,5 +1,5 @@
 #include "threads/fixed-point.h"
-
+/*
 fixed_point TO_FIXED_POINT(int n)
 {
   return n * F;
@@ -54,4 +54,4 @@ fixed_point DIV_FIXED_POINT_BY_INT(fixed_point x, int n)
 {
   return x / n;
 }
-
+*/
