@@ -53,9 +53,10 @@ sema_init (struct semaphore *sema, unsigned value)
 /* Returns true if effective priority of thread a
    is less than effective priority of thread b. */
 bool
-less_priority(const struct list_elem *a, const struct list_elem *b,
-            void *aux UNUSED) {
-
+less_priority(const struct list_elem *a, 
+              const struct list_elem *b,
+              void *aux UNUSED) 
+{
   struct thread* thread_to_insert = list_entry(a, struct thread, elem);
   int64_t a_priority =  thread_to_insert->effective_priority;
   struct thread* thread_in_list = list_entry(b, struct thread, elem);
@@ -81,11 +82,15 @@ sema_down (struct semaphore *sema)
 
   old_level = intr_disable ();
   thread_current()->waiting_on_sema = sema;
+
   while (sema->value == 0) {
     list_insert_ordered(&sema->waiters,
-        &thread_current()->elem, less_priority, NULL);
+                        &thread_current()->elem, 
+                        less_priority, 
+                        NULL);
     thread_block();
   }
+
   sema->value--;
   thread_current()->waiting_on_sema = NULL;
   intr_set_level (old_level);
@@ -105,13 +110,14 @@ sema_try_down (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (sema->value > 0)
-    {
-      sema->value--;
-      success = true;
-    }
-  else
+
+  if (sema->value > 0) {
+    sema->value--;
+    success = true;
+  } else {
     success = false;
+  }
+
   intr_set_level (old_level);
 
   return success;
@@ -135,10 +141,13 @@ sema_up (struct semaphore *sema)
 		to_unblock=list_entry(list_pop_back(&sema->waiters),struct thread,elem);
     thread_unblock(to_unblock);
   }
+
   sema->value++;
-	if(to_unblock!=NULL && !intr_context()){
+
+	if (to_unblock!=NULL && !intr_context()) {
 		thread_yield ();
 	}
+
   intr_set_level (old_level);
 }
 
@@ -157,11 +166,12 @@ sema_self_test (void)
   sema_init (&sema[0], 0);
   sema_init (&sema[1], 0);
   thread_create ("sema-test", PRI_DEFAULT, sema_test_helper, &sema);
-  for (i = 0; i < 10; i++)
-    {
-      sema_up (&sema[0]);
-      sema_down (&sema[1]);
-    }
+
+  for (i = 0; i < 10; i++) {
+    sema_up (&sema[0]);
+    sema_down (&sema[1]);
+  }
+
   printf ("done.\n");
 }
 
@@ -172,11 +182,10 @@ sema_test_helper (void *sema_)
   struct semaphore *sema = sema_;
   int i;
 
-  for (i = 0; i < 10; i++)
-    {
-      sema_down (&sema[0]);
-      sema_up (&sema[1]);
-    }
+  for (i = 0; i < 10; i++) {
+    sema_down (&sema[0]);
+    sema_up (&sema[1]);
+  }
 }
 
 /* Initializes LOCK.  A lock can be held by at most a single
@@ -201,7 +210,6 @@ lock_init (struct lock *lock)
 
   lock->holder = NULL;
   sema_init (&lock->semaphore, 1);
-
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -339,7 +347,7 @@ cond_wait (struct condition *cond, struct lock *lock)
 
   sema_init (&waiter.semaphore, 0);
   list_insert_ordered(&cond->waiters, &waiter.elem,
-      less_priority_sema, &thread_current()->effective_priority);
+    less_priority_sema, &thread_current()->effective_priority);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -378,8 +386,9 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   ASSERT (cond != NULL);
   ASSERT (lock != NULL);
 
-  while (!list_empty (&cond->waiters))
-    cond_signal (cond, lock);
+  while (!list_empty (&cond->waiters)) {
+    cond_signal (cond, lock);    
+  }
 }
 
 /* Returns true if effective priority given as argument aux
@@ -388,12 +397,14 @@ cond_broadcast (struct condition *cond, struct lock *lock)
    element is at the end of the ordered list of waiters. */
 bool
 less_priority_sema(const struct list_elem *a UNUSED,
-    const struct list_elem *b, void *aux) {
+                   const struct list_elem *b, 
+                   void *aux) 
+{
 
-  struct semaphore_elem *sema_in_list =
-      list_entry(b, struct semaphore_elem, elem);
-  int64_t b_priority =
-      list_entry(list_rbegin(&sema_in_list->semaphore.waiters),
+  struct semaphore_elem *sema_in_list 
+    = list_entry(b, struct semaphore_elem, elem);
+  int64_t b_priority 
+    = list_entry(list_rbegin(&sema_in_list->semaphore.waiters),
 		  	  	  	  	  	  	struct thread, elem)->effective_priority;
 
   return *(int*)aux <= b_priority;
