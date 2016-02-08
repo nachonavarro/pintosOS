@@ -175,11 +175,9 @@ thread_tick (void)
 	  if (timer_ticks() % TIMER_FREQ == 0) {
 		  thread_update_load_avg();
 		  thread_foreach(thread_update_recent_cpu, NULL);
-	  }
-
-	  /* Every 4 ticks, update the priority of all threads. */
-	  if (timer_ticks() % TIME_SLICE == 0) {
 		  thread_foreach(thread_update_bsd_priority, NULL);
+	  } else if (timer_ticks() % TIME_SLICE == 0) {
+		  thread_update_bsd_priority(thread_current(), NULL);
 	  }
 
   }
@@ -352,8 +350,6 @@ void
 thread_exit (void)
 {
   ASSERT (!intr_context ());
-
-
 
 #ifdef USERPROG
   process_exit ();
@@ -629,9 +625,7 @@ void
 thread_update_recent_cpu(struct thread *cur, void *aux UNUSED) {
  
   if (!is_idle_thread(cur)) {
-	  enum intr_level old_level = intr_disable ();
 	  cur->recent_cpu = thread_calculate_recent_cpu(cur->recent_cpu, cur->nice);
-	  intr_set_level (old_level);
   }
 }
 
@@ -640,9 +634,6 @@ int
 thread_get_load_avg (void)
 {
   fixed_point lavg = MUL_INT_AND_FIXED_POINT(100, load_avg);
-  printf("Load average: %d\n", load_avg);
-  printf("Load average rounded: %d\n",TO_INT_ROUND_TO_NEAREST(lavg));
-  printf("Number of ready_threads: %d\n", num_of_ready_threads);
   return TO_INT_ROUND_TO_NEAREST(lavg);
 }
 
@@ -660,9 +651,7 @@ thread_calculate_load_avg(fixed_point load)
 void
 thread_update_load_avg(void)
 {
-	  enum intr_level old_level = intr_disable ();
 	  load_avg = thread_calculate_load_avg(load_avg);
-	  intr_set_level (old_level);
 }
 
 /* Returns highest priority out of all threads that are ready. */
@@ -787,7 +776,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   if (thread_mlfqs) {
     /* Set initial threads niceness and recent_cpu to 0. */
-    if (!strcmp("main", name)) {
+    if (t == initial_thread) {
       t->nice = 0;
       t->recent_cpu = 0;
     } else {
