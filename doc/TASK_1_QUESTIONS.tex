@@ -228,7 +228,7 @@ ordered list of waiting threads as a way to ensure the highest priority thread w
 
 \subsubsection{Sequence of events in \texttt{lock\_acquire()}}
 
-When a call to \texttt{lock_acquire} causes a priority donation, the following sequence of events happens:
+When a call to \texttt{lock\_acquire} causes a priority donation, the following sequence of events happens:
 
 \begin{enumerate}
 
@@ -256,7 +256,7 @@ When \texttt{lock\_release()} is called on a lock that a higher priority thread 
 
 \item The lock is removed from the list of locks the current thread is holding.
 
-\item We call a helper method \texttt{thread_recalculate_effective_priority()} on the current thread: if the current thread does not hold any other locks, it takes back its base priority value and the method returns. Otherwise, it traverses through the list of locks it is holding, setting its effective priority to the largest effective priority out of the effective priorities of the lock's waiters.
+\item We call a helper method \texttt{thread\_recalculate\_effective\_priority()} on the current thread: if the current thread does not hold any other locks, it takes back its base priority value and the method returns. Otherwise, it traverses through the list of locks it is holding, setting its effective priority to the largest effective priority out of the effective priorities of the lock's waiters.
 
 \item In that case, if the current thread's effective priority is lower than the highest available priority found in the previous traversal, the thread yields.
 
