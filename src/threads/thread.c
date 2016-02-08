@@ -171,13 +171,13 @@ thread_tick (void)
 	if (!is_idle_thread(cur)) 
 	  thread_current()->recent_cpu = ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
 
-	  /* Every second, for current thread, update load_avg and recent_cpu. */
+	  /* Every second update load_avg and recent_cpu of all threads. */
 	  if (timer_ticks() % TIMER_FREQ == 0) {
 		  thread_update_load_avg();
-      thread_foreach(thread_update_recent_cpu, NULL);
+		  thread_foreach(thread_update_recent_cpu, NULL);
 	  }
 
-	  /* Every 4 ticks, update priority of current thread. */
+	  /* Every 4 ticks, update the priority of all threads. */
 	  if (timer_ticks() % TIME_SLICE == 0) {
 		  thread_foreach(thread_update_bsd_priority, NULL);
 	  }
@@ -279,7 +279,7 @@ thread_block (void)
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
 
-  if (thread_mlfqs && strcmp("idle", thread_current()->name)) {
+  if (thread_mlfqs && !is_idle_thread(thread_current())) {
 	  num_of_ready_threads--;
   }
 
@@ -528,10 +528,7 @@ thread_recalculate_effective_priority(struct thread *t) {
 	}
 }
 
-////////////////////////////////////////////////
-// BSD SCHEDULER FUNCTIONS: ///////////////////
-//////////////////////////////////////////////
-//////////////////////////////////////////////
+/* BSD SCHEDULER FUNCTIONS: */
 
 /* Sets the current thread's nice value to NEW_NICE. */
 void
@@ -539,10 +536,21 @@ thread_set_nice (int nice)
 {
   ASSERT (nice <= 20);
   ASSERT (nice >= -20);
+  	/* Disable interrupts when setting nice */
+  	enum intr_level old_level = intr_disable();
 	struct thread *t = thread_current();
 	t->nice = nice;
 	/* Must update a threads priority when setting its nice value. */
 	thread_update_bsd_priority(t, NULL);
+	intr_set_level(old_level);
+	/* Yield if not highest priority */
+	if (thread_get_priority() < highest_ready_priority()) {
+		if (!intr_context()){
+			thread_yield();
+		} else {
+			intr_yield_on_return();
+		}
+	}
 }
 
 /* Returns the current thread's nice value. */
@@ -582,25 +590,15 @@ thread_calculate_bsd_priority(fixed_point recent_cpu, int nice)
 void
 thread_update_bsd_priority (struct thread *t, void *aux UNUSED)
 {
-	ASSERT (thread_mlfqs);
+  ASSERT (thread_mlfqs);
 
   t->effective_priority = thread_calculate_bsd_priority(t->recent_cpu, t->nice);
 
   /* If a threads priority changes in mlfqs mode, we need to move it
      to a different priority queue in ready_lists_bsd. */
-  if (t != idle_thread && t->status == THREAD_READY) {
-    enum intr_level old_level = intr_disable();
+  if (!is_idle_thread(t) && t->status == THREAD_READY) {
     list_remove(&t->elem);
     add_to_ready_list(t);
-    intr_set_level(old_level);
-  }
-
-  if (thread_get_priority() < highest_ready_priority()) {
-	 if (!intr_context()){
-		 thread_yield();
-	 } else {
-		 intr_yield_on_return();
-	 }
   }
 }
 
@@ -630,7 +628,7 @@ thread_calculate_recent_cpu(fixed_point recent_cpu, int thread_nice) {
 void
 thread_update_recent_cpu(struct thread *cur, void *aux UNUSED) {
  
-  if (cur != idle_thread) {
+  if (!is_idle_thread(cur)) {
 	  enum intr_level old_level = intr_disable ();
 	  cur->recent_cpu = thread_calculate_recent_cpu(cur->recent_cpu, cur->nice);
 	  intr_set_level (old_level);
@@ -652,11 +650,11 @@ thread_get_load_avg (void)
 fixed_point
 thread_calculate_load_avg(fixed_point load)
 {
-  ASSERT(intr_get_level() == INTR_OFF);
-	fixed_point load_part  = DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(59), 60);
-	fixed_point ready_part = DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60);
-	load  = MUL_FIXED_POINTS(load_part, load) +  MUL_INT_AND_FIXED_POINT(num_of_ready_threads, ready_part);
-	return load;
+	  ASSERT(intr_get_level() == INTR_OFF);
+  	  fixed_point load_part  = DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(59), 60);
+  	  fixed_point ready_part = DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60);
+  	  load  = MUL_FIXED_POINTS(load_part, load) +  MUL_INT_AND_FIXED_POINT(num_of_ready_threads, ready_part);
+  	  return load;
 }
 
 void
