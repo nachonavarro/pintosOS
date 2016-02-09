@@ -392,6 +392,10 @@ fixed_point load_avg;                  /* System-wide load_avg variable. */
 \subsection{Ambiguities in scheduler specification and resolution}
 \subsubsection{Dividing cost of scheduling}
 
+
+We have tried to put as little code as possible inside the interrupt context to improve efficiency and precision. Indeed, as an interrupt happens often (every 0.04 seconds), we do not want to recompute values if we do not need to as we will spend too much time inside the interrupt context and we will lose speed. Putting the code outside the interrupt context as much as possible allows the code only to be used when it is needed, therefore keeping the code efficiency as high as possible. 
+
+
 \subsection{Rationale}
 \subsubsection{Critique of design}
 
