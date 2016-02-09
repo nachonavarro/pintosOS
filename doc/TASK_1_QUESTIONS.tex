@@ -9,6 +9,7 @@
 \usepackage{courier} % Required for the courier font
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{multirow}
 \renewcommand{\_}{\char`_}
 
 % Margins
@@ -380,6 +381,33 @@ fixed_point load_avg;                  /* System-wide load_avg variable. */
 
 \subsection{Algorithms}
 \subsubsection{Table}
+
+If we have three threads A, B and C with \texttt{nice} values 0, 1 and 2, and \texttt{recent\_cpu} values equal to 0, the following scheduling decisions will be made:
+
+\newpage
+
+\begin{table}[]
+\centering
+\caption{Thread Scheduling Decisions}
+\label{Thread table}
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+\multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}l@{}}Timer \\ ticks\end{tabular}}} & \multicolumn{3}{l|}{\textbf{Recent cpu}} & \multicolumn{3}{l|}{\textbf{Priority}} & \multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}l@{}}Thread\\ to run\end{tabular}}} \\ \cline{2-7}
+                                                                                 & \textbf{A}   & \textbf{B}   & \textbf{C}  & \textbf{A}  & \textbf{B}  & \textbf{C} &                                                                                   \\ \hline
+\textit{0}                                                                       & 0            & 0            & 0           & 63          & 61          & 59         & A                                                                                 \\ \hline
+\textit{4}                                                                       & 4            & 0            & 0           & 62          & 61          & 59         & A                                                                                 \\ \hline
+\textit{8}                                                                       & 8            & 0            & 0           & 61          & 61          & 59         & B                                                                                 \\ \hline
+\textit{12}                                                                      & 8            & 4            & 0           & 61          & 60          & 59         & A                                                                                 \\ \hline
+\textit{16}                                                                      & 12           & 4            & 0           & 60          & 60          & 59         & B                                                                                 \\ \hline
+\textit{20}                                                                      & 12           & 8            & 0           & 60          & 59          & 59         & A                                                                                 \\ \hline
+\textit{24}                                                                      & 16           & 8            & 0           & 59          & 59          & 59         & C                                                                                 \\ \hline
+\textit{28}                                                                      & 16           & 8            & 4           & 59          & 59          & 58         & B                                                                                 \\ \hline
+\textit{32}                                                                      & 16           & 12           & 4           & 59          & 58          & 58         & A                                                                                 \\ \hline
+\textit{36}                                                                      & 20           & 12           & 4           & 58          & 58          & 58         & C                                                                                 \\ \hline
+\end{tabular}
+\end{table}
+
+
 \subsubsection{Ambiguities in scheduler specification and resolution}
 \subsubsection{Dividing cost of scheduling}
 
