@@ -49,6 +49,9 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+/* Lock used by thread_set_priority() and thread_donate_priority(). */
+static struct lock priority_lock;
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
   {
@@ -105,6 +108,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
+  lock_init(&priority_lock);
   /* Initialise the 64 queues */
   if (thread_mlfqs) {
     int i;
@@ -171,12 +175,17 @@ thread_tick (void)
     struct thread *cur = thread_current();
 
     /* Increment recent_cpu by 1 except if the idle thread is running */
-  if (!is_idle_thread(cur)) {
-    thread_current()->recent_cpu 
-      = ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
-  }
+    if (!is_idle_thread(cur)) {
+      thread_current()->recent_cpu
+        = ADD_INT_AND_FIXED_POINT(1, thread_current()->recent_cpu);
+    }
     
-    /* Every second update load_avg and recent_cpu of all threads. */
+    /* Every second update load_avg and recent_cpu of all threads.
+       Only need to update priority if recent_cpu has changed, which
+       happens every second, or every tick for the current thread.
+       Note, we don't need to worry about the niceness having changed,
+       which would mean we have to recalculate priority, because
+       thread_set_nice() will automatically recalculate the priority. */
     if (timer_ticks() % TIMER_FREQ == 0) {
       thread_update_load_avg();
       thread_foreach(thread_update_recent_cpu, NULL);
@@ -438,6 +447,11 @@ thread_set_priority (int new_priority)
     return;
   }
 
+  /* Acquired at the start of thread_set_priority() and
+     thread_donate_priority(), and released later on in
+     the function. Avoids race conditions. */
+  lock_acquire(&priority_lock);
+
   struct thread *t = thread_current();
 
  /* Always sets the base priority to new_priority. */
@@ -450,6 +464,8 @@ thread_set_priority (int new_priority)
   if (t->base_priority > t->effective_priority) {
     t->effective_priority = t->base_priority;
   }
+
+  lock_release(&priority_lock);
 
   /* Recalculate effective priority of thread based on the locks it is
      holding. */
@@ -473,16 +489,22 @@ thread_set_priority (int new_priority)
 void
 thread_donate_priority (struct thread *t, int priority) 
 {
+  /* Acquired at the start of thread_set_priority() and
+       thread_donate_priority(), and released later on in
+       the function. Avoids race conditions. */
+  lock_acquire(&priority_lock);
+
   if (t->effective_priority >= priority) {
     return;
   }
 
   t->effective_priority = priority;
 
+  lock_release(&priority_lock);
+
   /* If we change the priority of an element in an ordered list, we
      need to remove that element and then reinsert it in the new correct
      position in the list, so that the list is still ordered. */
-
   if (t->status == THREAD_BLOCKED) {
     ASSERT(!list_empty(&t->waiting_on_sema->waiters));
 
@@ -595,7 +617,7 @@ thread_calculate_bsd_priority(fixed_point recent_cpu, int nice)
 {
   int effective_priority;
   fixed_point cpu_term 
-    = DIV_FIXED_POINT_BY_INT(recent_cpu, RECENTCPU_DIVISOR);
+      = DIV_FIXED_POINT_BY_INT(recent_cpu, RECENTCPU_DIVISOR);
   int nice_term = nice * NICE_COEFFICIENT;
   effective_priority = PRI_MAX - TO_INT_ROUND_ZERO(cpu_term) - nice_term;
     /* If priority calculated is invalid, it is rounded to the nearest valid
@@ -641,22 +663,22 @@ thread_get_recent_cpu (void)
 fixed_point
 thread_calculate_recent_cpu(fixed_point recent_cpu, int thread_nice) 
 {
-    fixed_point lavg_part_numerator 
+  fixed_point lavg_part_numerator
       = MUL_INT_AND_FIXED_POINT(2, load_avg);
 
-    fixed_point lavg_part_denominator 
+  fixed_point lavg_part_denominator
       = ADD_INT_AND_FIXED_POINT(1, lavg_part_numerator);
 
-    fixed_point lavg_part_fraction 
+  fixed_point lavg_part_fraction
       = DIV_FIXED_POINTS(lavg_part_numerator, lavg_part_denominator);
 
-    fixed_point lavg_cpu_mult 
+  fixed_point lavg_cpu_mult
       = MUL_FIXED_POINTS(lavg_part_fraction, recent_cpu);
 
-    fixed_point rcpu 
+  fixed_point rcpu
       = ADD_INT_AND_FIXED_POINT(thread_nice, lavg_cpu_mult);
 
-    return rcpu;
+  return rcpu;
 }
 
 /* Updates current thread's recent_cpu value. */
@@ -693,7 +715,7 @@ thread_calculate_load_avg(fixed_point load)
 void
 thread_update_load_avg(void)
 {
-    load_avg = thread_calculate_load_avg(load_avg);
+  load_avg = thread_calculate_load_avg(load_avg);
 }
 
 /* Returns highest priority out of all threads that are ready. */
@@ -710,7 +732,7 @@ highest_ready_priority(void)
 
     for (i = NUM_PRIORITIES - 1; i >= 0; i--) {
       if (!list_empty(&ready_lists_bsd[i])) {
-          return i + PRI_MIN;
+        return i + PRI_MIN;
       }
     }
     /* If no threads are ready, return -1. However, this function
