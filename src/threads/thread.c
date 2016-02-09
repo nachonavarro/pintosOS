@@ -49,9 +49,6 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
-/* Lock used by thread_set_priority() and thread_donate_priority(). */
-static struct lock priority_lock;
-
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
   {
@@ -108,7 +105,6 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  lock_init(&priority_lock);
   /* Initialise the 64 queues */
   if (thread_mlfqs) {
     int i;
@@ -447,11 +443,6 @@ thread_set_priority (int new_priority)
     return;
   }
 
-  /* Acquired at the start of thread_set_priority() and
-     thread_donate_priority(), and released later on in
-     the function. Avoids race conditions. */
-  lock_acquire(&priority_lock);
-
   struct thread *t = thread_current();
 
  /* Always sets the base priority to new_priority. */
@@ -464,8 +455,6 @@ thread_set_priority (int new_priority)
   if (t->base_priority > t->effective_priority) {
     t->effective_priority = t->base_priority;
   }
-
-  lock_release(&priority_lock);
 
   /* Recalculate effective priority of thread based on the locks it is
      holding. */
@@ -489,22 +478,16 @@ thread_set_priority (int new_priority)
 void
 thread_donate_priority (struct thread *t, int priority) 
 {
-  /* Acquired at the start of thread_set_priority() and
-       thread_donate_priority(), and released later on in
-       the function. Avoids race conditions. */
-  lock_acquire(&priority_lock);
-
   if (t->effective_priority >= priority) {
     return;
   }
 
   t->effective_priority = priority;
 
-  lock_release(&priority_lock);
-
   /* If we change the priority of an element in an ordered list, we
      need to remove that element and then reinsert it in the new correct
      position in the list, so that the list is still ordered. */
+
   if (t->status == THREAD_BLOCKED) {
     ASSERT(!list_empty(&t->waiting_on_sema->waiters));
 
