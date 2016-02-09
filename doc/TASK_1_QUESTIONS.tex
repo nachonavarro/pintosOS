@@ -64,16 +64,6 @@
 \maketitle
 \newpage
 
-\section{Group}
-
-Corentin Herbinet: cah214@ic.ac.uk
-
-Ignacio Navarro
-
-Vinothan Shankar
-
-William Springsteen: ws1514@ic.ac.uk
-
 \section{Design Questions: Priority Scheduling}
 \subsection{Data Structures}
 \subsubsection{Purpose of new variables and 'struct' members}
@@ -240,7 +230,7 @@ When a call to \texttt{lock\_acquire} causes a priority donation, the following 
 
 \item In that case, we check the holder's status: if it is blocked, we remove it from the list of waiting threads and reinsert it in the right order depending on its new priority. If the holder is ready, we remove it from the list of waiting threads and add it to the list of threads ready to run.
 
-\item Finally, if the holder of the lock (Lock A) is waiting for another lock (Lock B) to be released, we call \texttt{thread\_donate\_priority()} with Lock B's holder and Lock A's holder's new priority: this helper method therefore works recursively in the case of nested priority donation.
+\item Finally, if the holder of the lock (Lock A) is waiting for another lock (Lock B) to be released, we call \texttt{thread\_donate\_priority()} with Lock B's holder and Lock A's holder's new priority: this helper method therefore works recursively in the case of nested priority donation. For a more detailed explanation on nested priorities, refer to question 1.1.2 with the diagrams.
 
 \item We then leave the helper method, and call \texttt{sema\_down()} on the lock's semaphore.
 
@@ -290,9 +280,7 @@ Both of these synchronization problems would be solved if \texttt{thread\_donate
 
 \subsection{Rationale}
 
-One design we considered was giving each lock a priority, and allowing each lock to be donated to. The effective priority of a thread would therefore be the maximum priority of the locks it was holding and it's base priority. However, we decided to change this to a design where each thread holds a list of locks that it is holding, and each thread has a pointer to the lock that it is waiting on. This design makes a lot more sense, as locks do not actually have priorities, so it is easier to understand and modify. The list of locks being held by a thread makes it very easy to find the effective priority of a thread, as we can just traverse through the list, and find the maximum priority out of any threads waiting on any of these locks, and then comparing this to the thread's base priority. Also, the pointer to the lock that a thread is waiting on makes it a lot easier to donate priorities in a chain, where thread L donates to thread M, and thread M donates to thread H, for example. This is because when a tead is donated to, the lock it's waiting on can be recursively donated to, along the chain (after we check that whether \texttt{waiting\_on\_lock} is \texttt{NULL}).
-
-\subsubsection{Choice of design and superiority to other designs}
+One design we considered was giving each lock a priority, and allowing each lock to be donated to. The effective priority of a thread would therefore be the maximum priority of the locks it was holding and it's base priority. However, we decided to change this to a design where each thread holds a list of locks that it is holding, and each thread has a pointer to the lock that it is waiting on. This design makes a lot more sense, as locks do not actually have priorities, so it is easier to understand and modify. The list of locks being held by a thread makes it very easy to find the effective priority of a thread, as we can just traverse through the list, and find the maximum priority out of any threads waiting on any of these locks, and then comparing this to the thread's base priority. Also, the pointer to the lock that a thread is waiting on makes it a lot easier to donate priorities in a chain, where thread L donates to thread M, and thread M donates to thread H, for example. This is because when a thread is donated to, the lock it's waiting on can be recursively donated to, along the chain (after we check that whether \texttt{waiting\_on\_lock} is \texttt{NULL}).
 
 \newpage
 
@@ -349,7 +337,7 @@ static int num_of_ready_threads;
                               DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60)
                               
 \end{lstlisting}
-
+\newpage
 \item From thread.h:
 \begin{lstlisting}
 struct thread
