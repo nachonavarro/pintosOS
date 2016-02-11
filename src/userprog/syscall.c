@@ -13,8 +13,28 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f)
 {
   printf ("system call!\n");
   thread_exit ();
+  f->esp
+}
+
+static void
+read_user_memory(uint32_t *pd, const void *uaddr) {
+  check_mem_ptr(pd, uaddr);
+
+}
+
+static void
+write_user_memory(uint32_t *pd, const void *uaddr) {
+  check_mem_ptr(pd, uaddr);
+
+}
+
+static void
+check_mem_ptr(uint32_t *pd, const void *uaddr) {
+  ASSERT(uaddr != NULL);
+  ASSERT(is_user_vaddr(uaddr));
+  ASSERT(pagedir_get_page(pd, uaddr) != NULL);
 }
