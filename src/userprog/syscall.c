@@ -19,6 +19,8 @@ static void sys_seek(void);
 static void sys_tell(void);
 static void sys_close(void);
 
+static void check_mem_ptr(const void *uaddr);
+
 void
 syscall_init (void) 
 {
@@ -28,6 +30,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+  //TODO: Must check that we can READ supplied user memory ptr here
+  //Only check if we can WRITE if the system call requires writing
+  //If check fails, must terminate process (exit??) and free its resources
+  check_mem_ptr(f->esp);
+
 	int syscall_number = *(f->esp);
 
 	switch(syscall_number) {
@@ -139,18 +146,6 @@ sys_tell(void) {
 
 static void
 sys_close(void) {
-
-}
-
-static void
-read_user_memory(uint32_t *pd, const void *uaddr) {
-  check_mem_ptr(pd, uaddr);
-
-}
-
-static void
-write_user_memory(uint32_t *pd, const void *uaddr) {
-  check_mem_ptr(pd, uaddr);
 
 }
 
