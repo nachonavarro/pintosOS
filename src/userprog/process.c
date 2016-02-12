@@ -36,11 +36,11 @@ process_execute (const char *file_name_and_args)
   char *fn_copy;
   tid_t tid;
 
-  /* Create copy of file name and args string */
-  char* name_args_copy;
-  strlcpy(name_args_copy, file_name_and_args, PGSIZE);
-
   ASSERT(strlen(file_name_and_args) > 0);
+
+  /* Create copy of file name and args string */
+  char* name_args_copy = malloc(sizeof(file_name_and_args));
+  strlcpy(name_args_copy, file_name_and_args, PGSIZE);
 
   /* Declaring helper pointer for strtok_r method */
   char *save_ptr;
@@ -62,6 +62,8 @@ process_execute (const char *file_name_and_args)
     args[number_of_args + 1] = strtok_r(name_args_copy, " ", &save_ptr);
     number_of_args++;
   }
+
+  free(name_args_copy);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, args);
