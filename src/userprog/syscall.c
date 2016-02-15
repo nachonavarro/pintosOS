@@ -5,6 +5,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+struct lock secure_file;
+
 static void syscall_handler (struct intr_frame *);
 static void sys_halt(void);
 static void sys_exit(int status);
@@ -15,7 +17,7 @@ static void sys_remove(void);
 static void sys_open(void);
 static void sys_filesize(void);
 static void sys_read(void);
-static void sys_write(void);
+static int sys_write(void);
 static void sys_seek(void);
 static void sys_tell(void);
 static void sys_close(void);
@@ -28,6 +30,7 @@ static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
 void
 syscall_init (void) 
 {
+  lock_init(&secure_file);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -48,7 +51,8 @@ syscall_handler (struct intr_frame *f)
 			sys_halt();
 			break;
 		case SYS_EXIT:
-			sys_exit(-1); //-1 is placeholder
+			uint32_t status = get_word_on_stack(f, 1);
+			sys_exit(status);
 			break;
 		case SYS_EXEC:
 			sys_exec();
@@ -98,6 +102,14 @@ sys_halt(void) {
 static void
 sys_exit(int status) {
 
+	// Not sure if parent thread will wake up.
+	struct thread *cur = thread_current();
+	if (cur->parent != NULL) {
+		cur->parent->exit_status = status;
+	}
+	printf("%s: exit(%d) \n", cur->name, status);
+	thread_exit();
+
 }
 
 static void
@@ -127,16 +139,16 @@ sys_open(void) {
 
 static void
 sys_filesize(void) {
-
+//USE LOCK
 }
 
 static void
 sys_read(void) {
-
+//USE LOCK
 }
 
-static void
-sys_write(void) {
+static int
+sys_write(int fd, const void *buffer, unsigned size) {
 
 }
 
@@ -158,7 +170,6 @@ sys_close(void) {
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
    Ensures that only aligned word access is possible. */
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
-  ASSERT((offset % 4) == 0);
 
   check_mem_ptr(f->esp);
   check_mem_ptr(f->esp + offset);
