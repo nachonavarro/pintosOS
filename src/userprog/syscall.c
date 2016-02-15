@@ -33,9 +33,10 @@ syscall_handler (struct intr_frame *f)
   //TODO: Must check that we can READ supplied user memory ptr here
   //Only check if we can WRITE if the system call requires writing
   //If check fails, must terminate process (exit??) and free its resources
-  check_mem_ptr(f->esp);
+  check_mem_ptr((const void *)f->esp);
 
-	int syscall_number = *(f->esp);
+  //TODO: Cast to an int* first? Not sure if you can dereference a void*
+	int syscall_number = *((int *)f->esp);
 
 	switch(syscall_number) {
 		case SYS_HALT:
@@ -149,9 +150,12 @@ sys_close(void) {
 
 }
 
+//TODO: Don't think we need to use pagedir_get_page, especially as we don't
+//have a pd to pass
+//TODO: Maybe this will be done by passing -1 exit status to parent?
 static void
-check_mem_ptr(uint32_t *pd, const void *uaddr) {
-  ASSERT(uaddr != NULL);
-  ASSERT(is_user_vaddr(uaddr));
-  ASSERT(pagedir_get_page(pd, uaddr) != NULL);
+check_mem_ptr(const void *uaddr) {
+  if (uaddr == NULL || !is_user_vaddr(uaddr)) {
+    sys_exit(-1); //TODO: Is -1 correct? And do we exit with only arg as int
+  }
 }
