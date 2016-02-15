@@ -7,7 +7,7 @@
 
 static void syscall_handler (struct intr_frame *);
 static void sys_halt(void);
-static void sys_exit(void);
+static void sys_exit(int status);
 static void sys_exec(void);
 static void sys_wait(void);
 static void sys_create(void);
@@ -21,6 +21,7 @@ static void sys_tell(void);
 static void sys_close(void);
 
 static void check_mem_ptr(const void *uaddr);
+static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 
 void
 syscall_init (void) 
@@ -34,17 +35,18 @@ syscall_handler (struct intr_frame *f)
   //TODO: Must check that we can READ supplied user memory ptr here
   //Only check if we can WRITE if the system call requires writing
   //If check fails, must terminate process (exit??) and free its resources
-  check_mem_ptr((const void *)f->esp);
+  //check_mem_ptr((const void *)f->esp);
+  //^^THIS IS NOW CHECK IN get_word_on_stack()
 
   //TODO: Cast to an int* first? Not sure if you can dereference a void*
-	int syscall_number = *((int *)f->esp);
+	int syscall_number = get_word_on_stack(f, 0);
 
 	switch(syscall_number) {
 		case SYS_HALT:
 			sys_halt();
 			break;
 		case SYS_EXIT:
-			sys_exit();
+			sys_exit(-1); //-1 is placeholder
 			break;
 		case SYS_EXEC:
 			sys_exec();
@@ -92,7 +94,7 @@ sys_halt(void) {
 }
 
 static void
-sys_exit(void) {
+sys_exit(int status) {
 
 }
 
@@ -149,6 +151,16 @@ sys_tell(void) {
 static void
 sys_close(void) {
 
+}
+
+/* Returns the word (4 bytes) at a given offset from a frames stack pointer.
+   Ensures that only aligned word access is possible. */
+static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
+  ASSERT((offset % 4) == 0);
+
+  check_mem_ptr(f->esp);
+  check_mem_ptr(f->esp + offset);
+  return *((uint32_t *)(f->esp + offset)); //TODO: Is uint32_t correct?
 }
 
 //TODO: Don't think we need to use pagedir_get_page, especially as we don't
