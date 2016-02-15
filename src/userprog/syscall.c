@@ -147,9 +147,22 @@ sys_read(void) {
 //USE LOCK
 }
 
+/* Writes size bytes from buffer to the OPEN file fd. Returns the number
+   of bytes actually written. Since file growth is not implemented, if we
+   get to the end of the file, just stop writing and return the number of
+   bytes already written. fd = 1 writes to the console. */
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
-
+  if (fd == 1) {
+    if (size < 300) {
+      putbuf(buffer, size);
+    } else {
+      putbuf(buffer, 300);
+      sys_write(fd, buffer, size - 300);
+    }
+    return size;
+  }
+  //TODO: Implement other cases (fd != 1)
 }
 
 static void
@@ -168,7 +181,7 @@ sys_close(void) {
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
-   Ensures that only aligned word access is possible. */
+   Only aligned word access is possible. */
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
 
   check_mem_ptr(f->esp);
