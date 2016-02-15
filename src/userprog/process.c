@@ -174,6 +174,10 @@ put_ptr_to_string_ptr_in_stack (void *esp, char ***ptr_to_string_ptr)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  //Runs in an infinite loop for now.
+  for(;;) {
+
+  }
   return -1;
 }
 
