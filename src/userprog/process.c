@@ -20,6 +20,10 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void put_string_in_stack(void *esp, char *string);
+static void put_int_in_stack(void *esp, int n);
+static void put_string_ptr_in_stack(void *esp, char **string_ptr);
+static void put_ptr_to_string_ptr_in_stack(void *esp, char ***ptr_to_string_ptr);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -36,7 +40,7 @@ process_execute (const char *file_name_and_args)
   struct process_info *process;
 
   /* Create copy of file name and args string */
-  char* name_args_copy = malloc(sizeof(file_name_and_args));
+  char* name_args_copy;
   strlcpy(name_args_copy, file_name_and_args, PGSIZE);
 
   /* Declaring helper pointer for strtok_r method */
@@ -50,19 +54,19 @@ process_execute (const char *file_name_and_args)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, process->filename, PGSIZE);
 
   /* Create an array of strings with arguments */
   process->number_of_args = 0;
-  while (strlen(name_args_copy) > 0) {
-    process->args[number_of_args] = strtok_r(name_args_copy, " ", &save_ptr);
+  while (strlen(name_args_copy) > 0) 
+  {
+    process->args[process->number_of_args] 
+      = strtok_r(name_args_copy, " ", &save_ptr);
     process->number_of_args++;
   }
 
-  free(name_args_copy);
-
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, process);
+  tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -71,8 +75,10 @@ process_execute (const char *file_name_and_args)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *process_to_start)
+start_process (void *process)
 {
+
+  struct process_info *process_to_start = (struct process_info*) process;
   struct intr_frame if_;
   bool success;
 
@@ -81,34 +87,36 @@ start_process (void *process_to_start)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (process_to_start->filename, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  palloc_free_page (process_to_start->filename);
   if (!success) 
     thread_exit ();
 
   /* Pushing arguments to the stack in reverse order */
-  for (int j = process_to_start->number_of_args; j > 0; j--) {
-    *--if_.esp = process_to_start->args[j-1];
+  for (int j = process_to_start->number_of_args; j > 0; j--) 
+  {
+    put_string_in_stack(if_.esp, process_to_start->args[j-1]);
   }
 
   /* Pushing null pointer sentinel */
-  *--if_.esp = 0;
+  put_int_in_stack(if_.esp, 0);
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = process_to_start->number_of_args; k > 0; k--) {
-    *--if_.esp = &(process_to_start->args[k-1]);
+  for (int k = process_to_start->number_of_args; k > 0; k--) 
+  {
+    put_string_ptr_in_stack(if_.esp, &(process_to_start->args[k-1]));
   }
 
   /* Pushing pointer to the first pointer */
-  *--if_.esp = &(process_to_start->args[0]);
+  put_ptr_to_string_ptr_in_stack(if_.esp, &(process_to_start->args));
 
   /* Pushing number of arguments */
-  *--if_.esp = process_to_start->number_of_args;
+  put_int_in_stack(if_.esp, process_to_start->number_of_args);
 
   /* Pushing fake return address */
-  *--if_.esp = 0;
+  put_int_in_stack(if_.esp, 0);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -120,6 +128,38 @@ start_process (void *process_to_start)
   NOT_REACHED ();
 }
 
+void
+put_string_in_stack (void *esp, char *string)
+{
+  esp--;
+  char *stack_elem_string = (char**) esp;
+  *stack_elem_string = string;
+}
+
+void
+put_int_in_stack (void *esp, int n) 
+{
+  esp--;
+  int stack_elem_int = (int*) esp;
+  stack_elem_int = n;
+}
+
+void
+put_string_ptr_in_stack (void *esp, char **string_ptr)
+{
+  esp--;
+  char **stack_elem_string_ptr = (char***) esp;
+  stack_elem_string_ptr = string_ptr;
+}
+
+void
+put_ptr_to_string_ptr_in_stack (void *esp, char ***ptr_to_string_ptr)
+{
+  esp--;
+  char ***stack_elem_ptr_to_string_ptr = (char****) esp;
+  stack_elem_ptr_to_string_ptr = ptr_to_string_ptr;
+}
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -129,6 +169,8 @@ start_process (void *process_to_start)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+
+
 int
 process_wait (tid_t child_tid UNUSED) 
 {
@@ -482,7 +524,7 @@ setup_stack (void **esp)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) 
       {
-        
+        *esp = PHYS_BASE - 12;
       }
       else
         palloc_free_page (kpage);
