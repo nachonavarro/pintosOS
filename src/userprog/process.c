@@ -21,11 +21,6 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
-/* Setting up static variables */
-static char *file_name;
-static char** args;
-static int number_of_args;
-
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -38,6 +33,8 @@ process_execute (const char *file_name_and_args)
 
   ASSERT(strlen(file_name_and_args) > 0);
 
+  struct process_info *process;
+
   /* Create copy of file name and args string */
   char* name_args_copy = malloc(sizeof(file_name_and_args));
   strlcpy(name_args_copy, file_name_and_args, PGSIZE);
@@ -46,7 +43,7 @@ process_execute (const char *file_name_and_args)
   char *save_ptr;
 
   /* Finding the file name by taking the first token until a space */
-  file_name = strtok_r(name_args_copy, " ", &save_ptr);
+  process->filename = strtok_r(name_args_copy, " ", &save_ptr);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -55,18 +52,17 @@ process_execute (const char *file_name_and_args)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  /* Create an array of strings with file name and arguments */
-  args[0] = fn_copy;
-  number_of_args = 0;
+  /* Create an array of strings with arguments */
+  process->number_of_args = 0;
   while (strlen(name_args_copy) > 0) {
-    args[number_of_args + 1] = strtok_r(name_args_copy, " ", &save_ptr);
-    number_of_args++;
+    process->args[number_of_args] = strtok_r(name_args_copy, " ", &save_ptr);
+    process->number_of_args++;
   }
 
   free(name_args_copy);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, args);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, process);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -75,22 +71,8 @@ process_execute (const char *file_name_and_args)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_and_args_parsed)
+start_process (void *process_to_start)
 {
-
-  /* File name is first element of string array */
-  file_name = (&file_name_and_args_parsed)[0];
-
-  /* Number of arguments is the size of the array divided by size of a string
-     minus 1 (because the file name is not an argument) */
-  int number_of_args 
-    = (sizeof(&file_name_and_args_parsed)/(sizeof(file_name))) - 1;
-  
-  /* Create an array of arguments without the file name */
-  for (int i = 0; i < number_of_args; i++) {
-    args[i] = (&file_name_and_args_parsed)[i+1];
-  }
-
   struct intr_frame if_;
   bool success;
 
@@ -105,6 +87,28 @@ start_process (void *file_name_and_args_parsed)
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
+
+  /* Pushing arguments to the stack in reverse order */
+  for (int j = process_to_start->number_of_args; j > 0; j--) {
+    *--if_.esp = process_to_start->args[j-1];
+  }
+
+  /* Pushing null pointer sentinel */
+  *--if_.esp = 0;
+
+  /* Pushing pointers to the arguments in reverse order */
+  for (int k = process_to_start->number_of_args; k > 0; k--) {
+    *--if_.esp = &(process_to_start->args[k-1]);
+  }
+
+  /* Pushing pointer to the first pointer */
+  *--if_.esp = &(process_to_start->args[0]);
+
+  /* Pushing number of arguments */
+  *--if_.esp = process_to_start->number_of_args;
+
+  /* Pushing fake return address */
+  *--if_.esp = 0;
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -478,27 +482,7 @@ setup_stack (void **esp)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) 
       {
-        /* Pushing arguments to the stack in reverse order */
-        for (int j = number_of_args; j > 0; j--) {
-          *--esp = args[j-1];
-        }
-
-        /* Pushing null pointer sentinel */
-        *--esp = 0;
-
-        /* Pushing pointers to the arguments in reverse order */
-        for (int k = number_of_args; k > 0; k--) {
-          *--esp = &(args[k-1]);
-        }
-
-        /* Pushing pointer to the first pointer */
-        *--esp = &(args[0]);
-
-        /* Pushing number of arguments */
-        *--esp = number_of_args;
-
-        /* Pushing fake return address */
-        *--esp = 0;
+        
       }
       else
         palloc_free_page (kpage);
