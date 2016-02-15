@@ -22,6 +22,8 @@ static void sys_close(void);
 
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
+static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
+                                                           uint32_t word);
 
 void
 syscall_init (void) 
@@ -162,6 +164,11 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
   check_mem_ptr(f->esp + offset);
   return *((uint32_t *)(f->esp + offset)); //TODO: Is uint32_t correct?
 }
+
+//static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
+//                                                           uint32_t word) {
+//
+//}
 
 //TODO: Don't think we need to use pagedir_get_page, especially as we don't
 //have a pd to pass
