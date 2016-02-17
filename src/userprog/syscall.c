@@ -35,6 +35,8 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
   //                                                         uint32_t word);
 
 // TODO: Yeah I don't know why Billy but Eclipse gives me an error if I put this in the header.
+//TODO: Why not use a struct file? And each process is meant to have a SET
+//      of independednt file descriptors (not inherited by child processed).
 struct proc_file {
   struct file *file;
   int fd;
@@ -58,15 +60,14 @@ syscall_handler (struct intr_frame *f)
   //check_mem_ptr((const void *)f->esp);
   //^^THIS IS NOW CHECK IN get_word_on_stack()
 
-  //TODO: Cast to an int* first? Not sure if you can dereference a void*
-	int syscall_number = get_word_on_stack(f, 0);
+	int syscall_number = (int)get_word_on_stack(f, 0);
 
 	switch(syscall_number) {
 		case SYS_HALT:
 			sys_halt();
 			break;
 		case SYS_EXIT:
-			int status = get_word_on_stack(f, 1);
+			int status = (int)get_word_on_stack(f, 1);
 			sys_exit(status);
 			/* Returns exit status to the kernel. */
 			f->eax = status;
@@ -80,41 +81,42 @@ syscall_handler (struct intr_frame *f)
 			sys_wait();
 			break;
 		case SYS_CREATE:
-			const char *filename  = get_word_on_stack(f, 1);
-			unsigned initial_size = get_word_on_stack(f, 2);
-			f->eax = sys_create(filename, initial_size);
+			const char *filename  = (const char *)get_word_on_stack(f, 1);
+			unsigned initial_size = (unsigned)get_word_on_stack(f, 2);
+			/* Returns true to the kernel if creation is successful. */
+			f->eax = (int)sys_create(filename, initial_size);
 			break;
 		case SYS_REMOVE:
-			const char *filename = get_word_on_stack(f, 1);
+			const char *filename = (const char *)get_word_on_stack(f, 1);
 			f->eax = sys_remove(filename);
 			break;
 		case SYS_OPEN:
-			const char *filename = get_word_on_stack(f, 1);
+			const char *filename = (const char *)get_word_on_stack(f, 1);
 			f->eax = sys_open(filename);
 			break;
 		case SYS_FILESIZE:
-			int fd = get_word_on_stack(f, 1);
-			f->eax = sys_open(fd);
+			int fd = (int)get_word_on_stack(f, 1);
+			f->eax = sys_filesize(fd);
 			break;
 		case SYS_READ:
-			int fd        = get_word_on_stack(f, 1);
-			void *buffer  = get_word_on_stack(f, 2);
-			unsigned size = get_word_on_stack(f, 3);
+			int fd        = (int)get_word_on_stack(f, 1);
+			void *buffer  = (void *)get_word_on_stack(f, 2);
+			unsigned size = (unsigned)get_word_on_stack(f, 3);
 			f->eax = sys_read(fd, buffer, size);
 			break;
 		case SYS_WRITE:
-			int fd        = get_word_on_stack(f, 1);
-			void *buffer  = get_word_on_stack(f, 2);
-			unsigned size = get_word_on_stack(f, 3);
+			int fd        = (int)get_word_on_stack(f, 1);
+			void *buffer  = (void *)get_word_on_stack(f, 2);
+			unsigned size = (unsigned)get_word_on_stack(f, 3);
 			f->eax = sys_write(fd, buffer, size);
 			break;
 		case SYS_SEEK:
-			int fd             = get_word_on_stack(f, 1);
-			unsigned position  = get_word_on_stack(f, 2);
+			int fd             = (int)get_word_on_stack(f, 1);
+			unsigned position  = (int)get_word_on_stack(f, 2);
 			seek(fd, position);
 			break;
 		case SYS_TELL:
-			int fd        = get_word_on_stack(f, 1);
+			int fd        = (int)get_word_on_stack(f, 1);
 			f->eax = sys_tell(fd);
 			break;
 		case SYS_CLOSE:
@@ -125,35 +127,51 @@ syscall_handler (struct intr_frame *f)
 
 }
 
-
-//SETTING ALL FUNCTIONS TO RETURN VOID FOR NOW. IT WILL DEPEND ON THE FUNCTION, THOUGH.
+/* Terminates Pintos by calling shutdown_power_off().
+   Should rarely be used, as some information is lost
+   (such as information about possible deadlocks). */
 static void
 sys_halt(void) {
 	shutdown_power_off();
 }
 
+/* Terminates the current user program. If the processes parent waits for it,
+   this status will be returned to the parent (This is what the parent is
+   waiting for). Status of 0 indicates success, and anything else indicates
+   an error. After this function is called in syscall_handler(), the exit
+   status is sent ('returned') to the kernel. */
 static void
 sys_exit(int status) {
 
-	// Not sure if parent thread will wake up.
 	struct thread *cur = thread_current();
+	//TODO: Not sure if parent thread will wake up, or if this is the correct
+	//      way to return the status to the parent.
 	if (cur->parent != NULL) {
 		cur->parent->exit_status = status;
 	}
+	/* Process termination message, printing process' name and exit status. */
 	printf("%s: exit(%d) \n", cur->name, status);
 	thread_exit();
 
 }
 
-//TODO: Do we need lock
+//TODO: Pretty sure we cannot return from exec until we know whether child has
+//      loaded successfully or not, although spec says we need to use
+//      synchronisation to ensure this (which is why the lock stuff is
+//      commented out).
+//TODO: Is the new process set as the child of the current thread already (in
+//      process_execute())? Or do we need to do it here?
+/* Runs the executable given in cmd_line. cmd_line includes the arguments as
+   well. Returns the new process' pid. Returns -1 if the process could not
+   load or run for some reason, which is returned from process_execute().
+   After this function is called in syscall_handler(), the new process' id
+   is sent to the kernel. */
 static pid_t
 sys_exec(const char *cmd_line) {
-  lock_acquire(&secure_file);
+//  lock_acquire(&secure_file);
   pid_t pid = process_execute(cmd_line);
-  lock_release(&secure_file);
+//  lock_release(&secure_file);
 
-  //Need to return -1 if program cannot load or run for any reason
-  //- process_execute should return this I think
   return pid;
 }
 
@@ -162,6 +180,8 @@ sys_wait(void) {
 
 }
 
+/* Creates file called 'file' that is initially 'initial_size_ bytes.
+   Returns true if successful. Creating a file does NOT open it. */
 static bool
 sys_create(const char *file, unsigned initial_size) {
 	lock_acquire(&secure_file);
@@ -170,6 +190,9 @@ sys_create(const char *file, unsigned initial_size) {
 	return success;
 }
 
+/* Removes file called 'file'. Returns true if successful, and false otherwise
+   (including when no file named 'file' exists). An open file can be removed,
+   but it is not closed. */
 static bool
 sys_remove(const char *file) {
 	lock_acquire(&secure_file);
@@ -185,14 +208,13 @@ sys_open(const char *file) {
 	struct file *fl = filesys_open(file);
 	check_valid_file(fl);
 	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
-	list_push_front(&thread_current()->files, &f->file_elem);
+	list_push_front(&thread_current()->files, &f->file_elem); //TODO: So is a files member in struct thread the list of files that are OPEN?
 	f->file = fl;
 	int file_descriptor = -1 ; //TODO: How do we assign a fd?
 	f->fd = file_descriptor;
 	lock_release(&secure_file);
+
 	return file_descriptor;
-
-
 }
 
 static int
@@ -206,12 +228,20 @@ sys_filesize(int fd) {
 
 static int
 sys_read(int fd, void *buffer, unsigned size) {
+  int bytes;
 	lock_acquire(&secure_file);
 	if (fd == 0) {
-		// TODO: Implement input from console.
+	  int i;
+	  uint8_t keys[size];
+	  for (i = 0; i < size; i++) {
+	    keys[size] = input_getc();
+	  }
+	  // TODO: Not sure what to do with the keys pressed found using input_getc()
+	  bytes = size;
+	} else {
+	  struct file *f = get_file(fd);
+	  bytes = file_read(f, buffer, size);
 	}
-	struct file *f = get_file(fd);
-	int bytes = file_read(f, buffer, size);
 	lock_release(&secure_file);
 	return bytes;
 }
@@ -222,8 +252,8 @@ sys_read(int fd, void *buffer, unsigned size) {
    bytes already written. fd = 1 writes to the console. */
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
-  lock_acquire(&secure_file);
   int bytes;
+  lock_acquire(&secure_file);
   if (fd == 1) {
     if (size < 300) {
       putbuf(buffer, size);
@@ -298,7 +328,8 @@ struct file* get_file(int fd) {
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
-   Only aligned word access is possible. */
+   Only aligned word access is possible because the stack pointer is cast
+   from a (void *) to a (uint32_t *). */
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
 
   check_mem_ptr(f->esp);
@@ -306,15 +337,11 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
   return *((uint32_t *)(f->esp) + offset); //TODO: Is uint32_t correct?
 }
 
-
-//TODO: Don't think we need to use pagedir_get_page, especially as we don't
-//have a pd to pass
-//TODO: Maybe this will be done by passing -1 exit status to parent?
 static void
 check_mem_ptr(const void *uaddr) {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
       || pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
-    sys_exit(-1); //TODO: Is -1 correct? And do we exit with only arg as int
+    sys_exit(-1);
   }
 }
 
