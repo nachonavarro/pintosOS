@@ -13,7 +13,7 @@ struct lock secure_file;
 static void syscall_handler (struct intr_frame *);
 static void sys_halt(void);
 static void sys_exit(int status);
-static void sys_exec(void);
+static pid_t sys_exec(const char *cmd_line);
 static void sys_wait(void);
 static void sys_create(void);
 static void sys_remove(void);
@@ -63,9 +63,13 @@ syscall_handler (struct intr_frame *f)
 		case SYS_EXIT:
 			uint32_t status = get_word_on_stack(f, 1);
 			sys_exit(status);
+			/* Returns exit status to the kernel. */
+			f->eax = status;
 			break;
 		case SYS_EXEC:
-			sys_exec();
+			pid_t pid = sys_exec("const char *cmd_line");
+			/* Returns new processes pid. */
+			f->eax = pid;
 			break;
 		case SYS_WAIT:
 			sys_wait();
@@ -122,9 +126,16 @@ sys_exit(int status) {
 
 }
 
-static void
-sys_exec(void) {
+//TODO: Do we need lock
+static pid_t
+sys_exec(const char *cmd_line) {
+  lock_acquire(&secure_file);
+  pid_t pid = process_execute(cmd_line);
+  lock_release(&secure_file);
 
+  //Need to return -1 if program cannot load or run for any reason
+  //- process_execute should return this I think
+  return pid;
 }
 
 static void
@@ -235,7 +246,8 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
 //TODO: Maybe this will be done by passing -1 exit status to parent?
 static void
 check_mem_ptr(const void *uaddr) {
-  if (uaddr == NULL || !is_user_vaddr(uaddr)) {
+  if (uaddr == NULL || !is_user_vaddr(uaddr)
+      || pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
     sys_exit(-1); //TODO: Is -1 correct? And do we exit with only arg as int
   }
 }
