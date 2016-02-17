@@ -6,6 +6,7 @@
 #include "threads/vaddr.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "userprog/process.h"
 
 
 struct lock secure_file;
@@ -15,27 +16,31 @@ static void sys_halt(void);
 static void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
 static void sys_wait(void);
-static void sys_create(void);
-static void sys_remove(void);
-static void sys_open(void);
+static bool sys_create(const char *file, unsigned initial_size);
+static bool sys_remove(const char *file);
+static int sys_open(const char *file);
 static int sys_filesize(int fd);
-static void sys_read(void);
-static int sys_write(int fd);
-static void sys_seek(void);
-static void sys_tell(void);
-static void sys_close(void);
+static int sys_read(int fd, void *buffer, unsigned size);
+static int sys_write(int fd, const void *buffer, unsigned size);
+static void sys_seek(int fd, unsigned position);
+static unsigned sys_tell(int fd);
+static void sys_close(int fd);
 
+// HELPER FUNCTIONS
 struct file* get_file(int fd);
+void check_valid_file(struct file *f)
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 //static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
   //                                                         uint32_t word);
-//TODO: Put this in header?
+
+// TODO: Yeah I don't know why Billy but Eclipse gives me an error if I put this in the header.
 struct proc_file {
   struct file *file;
   int fd;
   struct list_elem file_elem;
 };
+
 
 void
 syscall_init (void) 
@@ -61,7 +66,7 @@ syscall_handler (struct intr_frame *f)
 			sys_halt();
 			break;
 		case SYS_EXIT:
-			uint32_t status = get_word_on_stack(f, 1);
+			int status = get_word_on_stack(f, 1);
 			sys_exit(status);
 			/* Returns exit status to the kernel. */
 			f->eax = status;
@@ -75,28 +80,42 @@ syscall_handler (struct intr_frame *f)
 			sys_wait();
 			break;
 		case SYS_CREATE:
-			sys_create();
+			const char *filename  = get_word_on_stack(f, 1);
+			unsigned initial_size = get_word_on_stack(f, 2);
+			f->eax = sys_create(filename, initial_size);
 			break;
 		case SYS_REMOVE:
-			sys_remove();
+			const char *filename = get_word_on_stack(f, 1);
+			f->eax = sys_remove(filename);
 			break;
 		case SYS_OPEN:
-			sys_open();
+			const char *filename = get_word_on_stack(f, 1);
+			f->eax = sys_open(filename);
 			break;
 		case SYS_FILESIZE:
-			sys_filesize();
+			int fd = get_word_on_stack(f, 1);
+			f->eax = sys_open(fd);
 			break;
 		case SYS_READ:
-			sys_read();
+			int fd        = get_word_on_stack(f, 1);
+			void *buffer  = get_word_on_stack(f, 2);
+			unsigned size = get_word_on_stack(f, 3);
+			f->eax = sys_read(fd, buffer, size);
 			break;
 		case SYS_WRITE:
-			sys_write();
+			int fd        = get_word_on_stack(f, 1);
+			void *buffer  = get_word_on_stack(f, 2);
+			unsigned size = get_word_on_stack(f, 3);
+			f->eax = sys_write(fd, buffer, size);
 			break;
 		case SYS_SEEK:
-			sys_seek();
+			int fd             = get_word_on_stack(f, 1);
+			unsigned position  = get_word_on_stack(f, 2);
+			seek(fd, position);
 			break;
 		case SYS_TELL:
-			sys_tell();
+			int fd        = get_word_on_stack(f, 1);
+			f->eax = sys_tell(fd);
 			break;
 		case SYS_CLOSE:
 			sys_close();
@@ -143,18 +162,36 @@ sys_wait(void) {
 
 }
 
-static void
-sys_create(void) {
+static bool
+sys_create(const char *file, unsigned initial_size) {
+	lock_acquire(&secure_file);
+	bool success = filesys_create(file, initial_size);
+	lock_release(&secure_file);
+	return success;
+}
+
+static bool
+sys_remove(const char *file) {
+	lock_acquire(&secure_file);
+	bool success = filesys_remove(file);
+	lock_release(&secure_file);
+	return success;
 
 }
 
-static void
-sys_remove(void) {
+static int
+sys_open(const char *file) {
+	lock_acquire(&secure_file);
+	struct file *fl = filesys_open(file);
+	check_valid_file(fl);
+	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
+	list_push_front(&thread_current()->files, &f->file_elem);
+	f->file = fl;
+	int file_descriptor = -1 ; //TODO: How do we assign a fd?
+	f->fd = file_descriptor;
+	lock_release(&secure_file);
+	return file_descriptor;
 
-}
-
-static void
-sys_open(void) {
 
 }
 
@@ -167,9 +204,16 @@ sys_filesize(int fd) {
 	return length;
 }
 
-static void
-sys_read(void) {
-//USE LOCK
+static int
+sys_read(int fd, void *buffer, unsigned size) {
+	lock_acquire(&secure_file);
+	if (fd == 0) {
+		// TODO: Implement input from console.
+	}
+	struct file *f = get_file(fd);
+	int bytes = file_read(f, buffer, size);
+	lock_release(&secure_file);
+	return bytes;
 }
 
 /* Writes size bytes from buffer to the OPEN file fd. Returns the number
@@ -192,24 +236,49 @@ sys_write(int fd, const void *buffer, unsigned size) {
     struct file *f = get_file(fd);
     bytes = file_write(f, buffer, size);
   }
+
+  struct file *f = get_file(fd);
+  check_valid_file(f);
+  int bytes = file_write(f, buffer, size);
   lock_release(&secure_file);
   return bytes;
 
 }
 
 static void
-sys_seek(void) {
+sys_seek(int fd, unsigned position) {
+	lock_acquire(&secure_file);
+	struct file *f = get_file(fd);
+	check_valid_file(f);
+	file_seek(f, position);
+	lock_release(&secure_file);
+}
+
+unsigned
+sys_tell(int fd) {
+	lock_acquire(&secure_file);
+	struct file *f = get_file(fd);
+	check_valid_file(f);
+	int position = file_tell(f);
+	lock_release(&secure_file);
+	return position;
 
 }
 
 static void
-sys_tell(void) {
-
-}
-
-static void
-sys_close(void) {
-
+sys_close(int fd) {
+	lock_acquire(&secure_file);
+	struct thread *cur = thread_current();
+	struct list_elem *e;
+	for (e = list_begin (&cur->files); e != list_end (&cur->files);
+	     e = list_next (e)) {
+		struct proc_file *f = list_entry(e, struct proc_file, file_elem);
+		if (fd == f->fd) {
+			file_close(f->file);
+			list_remove(f->file_elem);
+		}
+	}
+	lock_release(&secure_file);
 }
 
 /* Returns the file corresponding the supplied file descriptor
@@ -224,7 +293,8 @@ struct file* get_file(int fd) {
 			return f->file;
 		}
 	}
-	  return NULL;
+	NOT_REACHED();
+	return NULL;
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
@@ -236,10 +306,6 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
   return *((uint32_t *)(f->esp) + offset); //TODO: Is uint32_t correct?
 }
 
-//static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
-//                                                           uint32_t word) {
-//
-//}
 
 //TODO: Don't think we need to use pagedir_get_page, especially as we don't
 //have a pd to pass
@@ -250,6 +316,15 @@ check_mem_ptr(const void *uaddr) {
       || pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
     sys_exit(-1); //TODO: Is -1 correct? And do we exit with only arg as int
   }
+}
+
+// PRE: We have acquired the lock to file system.
+void
+check_valid_file(struct file *f) {
+	if (!f) {
+		lock_release(&secure_file);
+		return;
+	}
 }
 
 
