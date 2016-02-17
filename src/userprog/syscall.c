@@ -6,6 +6,7 @@
 #include "threads/vaddr.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "userprog/process.h"
 
 
 struct lock secure_file;
@@ -15,27 +16,31 @@ static void sys_halt(void);
 static void sys_exit(int status);
 static void sys_exec(void);
 static void sys_wait(void);
-static void sys_create(void);
-static void sys_remove(void);
-static void sys_open(void);
+static bool sys_create(const char *file, unsigned initial_size);
+static bool sys_remove(const char *file);
+static int sys_open(const char *file);
 static int sys_filesize(int fd);
 static int sys_read(int fd, void *buffer, unsigned size);
 static int sys_write(int fd, const void *buffer, unsigned size);
-static void sys_seek(void);
-static void sys_tell(void);
-static void sys_close(void);
+static void sys_seek(int fd, unsigned position);
+static unsigned sys_tell(int fd);
+static void sys_close(int fd);
 
+// HELPER FUNCTIONS
 struct file* get_file(int fd);
+void check_valid_file(struct file *f)
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
-static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
-                                                           uint32_t word);
+//static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
+  //                                                         uint32_t word);
 
+// TODO: Yeah I don't know why Billy but Eclipse gives me an error if I put this in the header.
 struct proc_file {
   struct file *file;
   int fd;
   struct list_elem file_elem;
 };
+
 
 void
 syscall_init (void) 
@@ -132,18 +137,36 @@ sys_wait(void) {
 
 }
 
-static void
-sys_create(void) {
+static bool
+sys_create(const char *file, unsigned initial_size) {
+	lock_acquire(&secure_file);
+	bool success = filesys_create(file, initial_size);
+	lock_release(&secure_file);
+	return success;
+}
+
+static bool
+sys_remove(const char *file) {
+	lock_acquire(&secure_file);
+	bool success = filesys_remove(file);
+	lock_release(&secure_file);
+	return success;
 
 }
 
-static void
-sys_remove(void) {
+static int
+sys_open(const char *file) {
+	lock_acquire(&secure_file);
+	struct file *fl = filesys_open(file);
+	check_valid_file(fl);
+	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
+	list_push_front(&thread_current()->files, &f->file_elem);
+	f->file = fl;
+	int file_descriptor = -1 ; //TODO: How do we assign a fd?
+	f->fd = file_descriptor;
+	lock_release(&secure_file);
+	return file_descriptor;
 
-}
-
-static void
-sys_open(void) {
 
 }
 
@@ -175,6 +198,7 @@ sys_read(int fd, void *buffer, unsigned size) {
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
   lock_acquire(&secure_file);
+  int bytes;
   if (fd == 1) {
     if (size < 300) {
       putbuf(buffer, size);
@@ -182,7 +206,10 @@ sys_write(int fd, const void *buffer, unsigned size) {
       putbuf(buffer, 300);
       sys_write(fd, buffer, size - 300);
     }
-    return size;
+    bytes = size;
+  } else {
+    struct file *f = get_file(fd);
+    bytes = file_write(f, buffer, size);
   }
 
   struct file *f = get_file(fd);
@@ -204,15 +231,33 @@ sys_seek(int fd, unsigned position) {
 
 unsigned
 sys_tell(int fd) {
+	lock_acquire(&secure_file);
+	struct file *f = get_file(fd);
+	check_valid_file(f);
+	int position = file_tell(f);
+	lock_release(&secure_file);
+	return position;
 
 }
 
 static void
-sys_close(void) {
-
+sys_close(int fd) {
+	lock_acquire(&secure_file);
+	struct thread *cur = thread_current();
+	struct list_elem *e;
+	for (e = list_begin (&cur->files); e != list_end (&cur->files);
+	     e = list_next (e)) {
+		struct proc_file *f = list_entry(e, struct proc_file, file_elem);
+		if (fd == f->fd) {
+			file_close(f->file);
+			list_remove(f->file_elem);
+		}
+	}
+	lock_release(&secure_file);
 }
 
-
+/* Returns the file corresponding the supplied file descriptor
+   'in the current thread\s list of files that it can see. */
 struct file* get_file(int fd) {
 	struct thread *cur = thread_current();
 	struct list_elem *e;
@@ -223,6 +268,8 @@ struct file* get_file(int fd) {
 			return f->file;
 		}
 	}
+	NOT_REACHED();
+	return NULL;
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
@@ -234,10 +281,6 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
   return *((uint32_t *)(f->esp) + offset); //TODO: Is uint32_t correct?
 }
 
-//static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
-//                                                           uint32_t word) {
-//
-//}
 
 //TODO: Don't think we need to use pagedir_get_page, especially as we don't
 //have a pd to pass
@@ -249,6 +292,7 @@ check_mem_ptr(const void *uaddr) {
   }
 }
 
+// PRE: We have acquired the lock to file system.
 void
 check_valid_file(struct file *f) {
 	if (!f) {
