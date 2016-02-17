@@ -19,8 +19,8 @@ static void sys_create(void);
 static void sys_remove(void);
 static void sys_open(void);
 static int sys_filesize(int fd);
-static void sys_read(void);
-static int sys_write(int fd);
+static int sys_read(int fd, void *buffer, unsigned size);
+static int sys_write(int fd, const void *buffer, unsigned size);
 static void sys_seek(void);
 static void sys_tell(void);
 static void sys_close(void);
@@ -156,9 +156,16 @@ sys_filesize(int fd) {
 	return length;
 }
 
-static void
-sys_read(void) {
-//USE LOCK
+static int
+sys_read(int fd, void *buffer, unsigned size) {
+	lock_acquire(&secure_file);
+	if (fd == 0) {
+		// TODO: Implement input from console.
+	}
+	struct file *f = get_file(fd);
+	int bytes = file_read(f, buffer, size);
+	lock_release(&secure_file);
+	return bytes;
 }
 
 /* Writes size bytes from buffer to the OPEN file fd. Returns the number
@@ -179,6 +186,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
   }
 
   struct file *f = get_file(fd);
+  check_valid_file(f);
   int bytes = file_write(f, buffer, size);
   lock_release(&secure_file);
   return bytes;
@@ -186,12 +194,16 @@ sys_write(int fd, const void *buffer, unsigned size) {
 }
 
 static void
-sys_seek(void) {
-
+sys_seek(int fd, unsigned position) {
+	lock_acquire(&secure_file);
+	struct file *f = get_file(fd);
+	check_valid_file(f);
+	file_seek(f, position);
+	lock_release(&secure_file);
 }
 
-static void
-sys_tell(void) {
+unsigned
+sys_tell(int fd) {
 
 }
 
@@ -211,7 +223,6 @@ struct file* get_file(int fd) {
 			return f->file;
 		}
 	}
-	  return NULL;
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
@@ -236,6 +247,14 @@ check_mem_ptr(const void *uaddr) {
   if (uaddr == NULL || !is_user_vaddr(uaddr)) {
     sys_exit(-1); //TODO: Is -1 correct? And do we exit with only arg as int
   }
+}
+
+void
+check_valid_file(struct file *f) {
+	if (!f) {
+		lock_release(&secure_file);
+		return;
+	}
 }
 
 
