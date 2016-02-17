@@ -28,9 +28,9 @@ static void sys_close(void);
 struct file* get_file(int fd);
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
-static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
-                                                           uint32_t word);
-
+//static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
+  //                                                         uint32_t word);
+//TODO: Put this in header?
 struct proc_file {
   struct file *file;
   int fd;
@@ -168,6 +168,7 @@ sys_read(void) {
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
   lock_acquire(&secure_file);
+  int bytes;
   if (fd == 1) {
     if (size < 300) {
       putbuf(buffer, size);
@@ -175,11 +176,11 @@ sys_write(int fd, const void *buffer, unsigned size) {
       putbuf(buffer, 300);
       sys_write(fd, buffer, size - 300);
     }
-    return size;
+    bytes = size;
+  } else {
+    struct file *f = get_file(fd);
+    bytes = file_write(f, buffer, size);
   }
-
-  struct file *f = get_file(fd);
-  int bytes = file_write(f, buffer, size);
   lock_release(&secure_file);
   return bytes;
 
@@ -200,7 +201,8 @@ sys_close(void) {
 
 }
 
-
+/* Returns the file corresponding the supplied file descriptor
+   'in the current thread\s list of files that it can see. */
 struct file* get_file(int fd) {
 	struct thread *cur = thread_current();
 	struct list_elem *e;
