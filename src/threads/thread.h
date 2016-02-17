@@ -125,10 +125,13 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                 /* Page directory. */
+
+
 #endif
 
     struct thread *parent;
     int exit_status;
+    struct list files;
 
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */

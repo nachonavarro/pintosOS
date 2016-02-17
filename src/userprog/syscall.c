@@ -4,6 +4,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+
 
 struct lock secure_file;
 
@@ -15,17 +18,24 @@ static void sys_wait(void);
 static void sys_create(void);
 static void sys_remove(void);
 static void sys_open(void);
-static void sys_filesize(void);
+static int sys_filesize(int fd);
 static void sys_read(void);
-static int sys_write(void);
+static int sys_write(int fd);
 static void sys_seek(void);
 static void sys_tell(void);
 static void sys_close(void);
 
+struct file* get_file(int fd);
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
                                                            uint32_t word);
+
+struct proc_file {
+  struct file *file;
+  int fd;
+  struct list_elem file_elem;
+};
 
 void
 syscall_init (void) 
@@ -137,9 +147,13 @@ sys_open(void) {
 
 }
 
-static void
-sys_filesize(void) {
-//USE LOCK
+static int
+sys_filesize(int fd) {
+	lock_acquire(&secure_file);
+	struct file *f = get_file(fd);
+	int length = file_length(f);
+	lock_release(&secure_file);
+	return length;
 }
 
 static void
@@ -153,6 +167,7 @@ sys_read(void) {
    bytes already written. fd = 1 writes to the console. */
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
+  lock_acquire(&secure_file);
   if (fd == 1) {
     if (size < 300) {
       putbuf(buffer, size);
@@ -162,7 +177,12 @@ sys_write(int fd, const void *buffer, unsigned size) {
     }
     return size;
   }
-  //TODO: Implement other cases (fd != 1)
+
+  struct file *f = get_file(fd);
+  int bytes = file_write(f, buffer, size);
+  lock_release(&secure_file);
+  return bytes;
+
 }
 
 static void
@@ -178,6 +198,20 @@ sys_tell(void) {
 static void
 sys_close(void) {
 
+}
+
+
+struct file* get_file(int fd) {
+	struct thread *cur = thread_current();
+	struct list_elem *e;
+	for (e = list_begin (&cur->files); e != list_end (&cur->files);
+	     e = list_next (e)) {
+		struct proc_file *f = list_entry(e, struct proc_file, file_elem);
+		if (fd == f->fd) {
+			return f->file;
+		}
+	}
+	  return NULL;
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
@@ -203,3 +237,5 @@ check_mem_ptr(const void *uaddr) {
     sys_exit(-1); //TODO: Is -1 correct? And do we exit with only arg as int
   }
 }
+
+
