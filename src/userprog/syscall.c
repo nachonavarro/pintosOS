@@ -66,7 +66,7 @@ syscall_handler (struct intr_frame *f)
 			sys_halt();
 			break;
 		case SYS_EXIT:
-			uint32_t status = get_word_on_stack(f, 1);
+			int status = get_word_on_stack(f, 1);
 			sys_exit(status);
 			break;
 		case SYS_EXEC:
@@ -76,28 +76,42 @@ syscall_handler (struct intr_frame *f)
 			sys_wait();
 			break;
 		case SYS_CREATE:
-			sys_create();
+			const char *filename  = get_word_on_stack(f, 1);
+			unsigned initial_size = get_word_on_stack(f, 2);
+			f->eax = sys_create(filename, initial_size);
 			break;
 		case SYS_REMOVE:
-			sys_remove();
+			const char *filename = get_word_on_stack(f, 1);
+			f->eax = sys_remove(filename);
 			break;
 		case SYS_OPEN:
-			sys_open();
+			const char *filename = get_word_on_stack(f, 1);
+			f->eax = sys_open(filename);
 			break;
 		case SYS_FILESIZE:
-			sys_filesize();
+			int fd = get_word_on_stack(f, 1);
+			f->eax = sys_open(fd);
 			break;
 		case SYS_READ:
-			sys_read();
+			int fd        = get_word_on_stack(f, 1);
+			void *buffer  = get_word_on_stack(f, 2);
+			unsigned size = get_word_on_stack(f, 3);
+			f->eax = sys_read(fd, buffer, size);
 			break;
 		case SYS_WRITE:
-			sys_write();
+			int fd        = get_word_on_stack(f, 1);
+			void *buffer  = get_word_on_stack(f, 2);
+			unsigned size = get_word_on_stack(f, 3);
+			f->eax = sys_write(fd, buffer, size);
 			break;
 		case SYS_SEEK:
-			sys_seek();
+			int fd             = get_word_on_stack(f, 1);
+			unsigned position  = get_word_on_stack(f, 2);
+			seek(fd, position);
 			break;
 		case SYS_TELL:
-			sys_tell();
+			int fd        = get_word_on_stack(f, 1);
+			f->eax = sys_tell(fd);
 			break;
 		case SYS_CLOSE:
 			sys_close();
