@@ -27,12 +27,9 @@ static unsigned sys_tell(int fd);
 static void sys_close(int fd);
 
 /* Helper functions for system calls. */
-struct file* get_file(int fd);
-void check_valid_file(struct file *f);
+static struct file* get_file(int fd);
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
-//static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
-  //                                                         uint32_t word);
 
 /* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
  * has a list of proc_files to represent the file descriptors it has open. Two
@@ -215,7 +212,6 @@ sys_open(const char *file) {
 	if (fl == NULL) {
 	  return -1;
 	}
-	check_valid_file(fl);
 	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
 	list_push_front(&thread_current()->files, &f->file_elem);
 	f->file = fl;
@@ -254,6 +250,10 @@ sys_read(int fd, void *buffer, unsigned size) {
 	  bytes = size;
 	} else {
 	  struct file *f = get_file(fd);
+	  if (!f) {
+	    lock_release(&secure_file);
+	    return -1;
+	  }
 	  bytes = file_read(f, buffer, size);
 	}
 	lock_release(&secure_file);
@@ -282,7 +282,10 @@ sys_write(int fd, const void *buffer, unsigned size) {
   }
 
   struct file *f = get_file(fd);
-  check_valid_file(f);
+  if (!f) {
+    lock_release(&secure_file);
+    return -1;
+  }
   int bytes = file_write(f, buffer, size);
   lock_release(&secure_file);
   return bytes;
@@ -295,6 +298,10 @@ static void
 sys_seek(int fd, unsigned position) {
 	lock_acquire(&secure_file);
 	struct file *f = get_file(fd);
+	if (!f) {
+    lock_release(&secure_file);
+    return;
+  }
 	check_valid_file(f);
 	file_seek(f, position);
 	lock_release(&secure_file);
@@ -306,7 +313,10 @@ unsigned
 sys_tell(int fd) {
 	lock_acquire(&secure_file);
 	struct file *f = get_file(fd);
-	check_valid_file(f);
+	if (!f) {
+    lock_release(&secure_file);
+    return;
+  }
 	int position = file_tell(f);
 	lock_release(&secure_file);
 	return position;
@@ -331,9 +341,9 @@ sys_close(int fd) {
 	lock_release(&secure_file);
 }
 
-/* Returns the file corresponding the supplied file descriptor
-   'in the current thread's list of files that it can see. */
-struct file* get_file(int fd) {
+/* Returns the file corresponding the to supplied file descriptor
+   in the current thread's list of files that it can see. */
+static struct file* get_file(int fd) {
 	struct thread *cur = thread_current();
 	struct list_elem *e;
 	for (e = list_begin (&cur->files); e != list_end (&cur->files);
@@ -365,16 +375,3 @@ check_mem_ptr(const void *uaddr) {
     sys_exit(-1);
   }
 }
-
-//TODO: What does this do? It won't stop the function that called this from
-//      running, it will just release the lock, so it can be interrupted.
-/* PRE: We have acquired the lock to file system. */
-void
-check_valid_file(struct file *f) {
-	if (!f) {
-		lock_release(&secure_file);
-		return;
-	}
-}
-
-
