@@ -8,7 +8,6 @@
 #include "filesys/filesys.h"
 #include "userprog/process.h"
 
-
 struct lock secure_file;
 
 static void syscall_handler (struct intr_frame *);
@@ -210,6 +209,7 @@ sys_open(const char *file) {
 	lock_acquire(&secure_file);
 	struct file *fl = filesys_open(file);
 	if (fl == NULL) {
+    lock_release(&secure_file);
 	  return -1;
 	}
 	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
