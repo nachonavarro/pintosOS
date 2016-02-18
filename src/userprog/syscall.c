@@ -69,7 +69,7 @@ syscall_handler (struct intr_frame *f)
 			f->eax = status;
 			break;
 		case SYS_EXEC:
-			pid_t pid = sys_exec("const char *cmd_line");
+			pid_t pid = sys_exec("const char *cmd_line"); //TODO: Not sure where to get this from
 			/* Returns new processes pid. */
 			f->eax = pid;
 			break;
