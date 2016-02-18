@@ -40,6 +40,9 @@ process_execute (const char *file_name_and_args)
 
   struct process_info *process;
 
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
   /* Create copy of file name and args string */
   char* name_args_copy = malloc(sizeof(file_name_and_args));
   strlcpy(name_args_copy, file_name_and_args, PGSIZE);
@@ -49,13 +52,6 @@ process_execute (const char *file_name_and_args)
 
   /* Finding the file name by taking the first token until a space */
   process->filename = strtok_r(name_args_copy, " ", &save_ptr);
-
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, process->filename, PGSIZE);
 
   /* Create an array of strings with arguments */
   process->number_of_args = 0;
@@ -67,6 +63,16 @@ process_execute (const char *file_name_and_args)
   }
 
   free(name_args_copy);
+  intr_set_level (old_level);
+
+
+  /* Make a copy of FILE_NAME.
+     Otherwise there's a race between the caller and load(). */
+  fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, process->filename, PGSIZE);
+
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
