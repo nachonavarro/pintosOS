@@ -168,7 +168,9 @@ sys_exit(int status) {
 static pid_t
 sys_exec(const char *cmd_line) {
 //  lock_acquire(&secure_file);
-  pid_t pid = process_execute(cmd_line);
+  /* Identity mapping between thread id and process id, because
+     Pintos is not multithreaded. */
+  pid_t pid = (pid_t)process_execute(cmd_line);
 //  lock_release(&secure_file);
 
   return pid;
