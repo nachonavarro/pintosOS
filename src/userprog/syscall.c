@@ -26,23 +26,23 @@ static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 static void sys_close(int fd);
 
-// HELPER FUNCTIONS
+/* Helper functions for system calls. */
 struct file* get_file(int fd);
-void check_valid_file(struct file *f)
+void check_valid_file(struct file *f);
 static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 //static uint32_t write_word_to_stack(struct intr_frame *f, int offset,
   //                                                         uint32_t word);
 
-// TODO: Yeah I don't know why Billy but Eclipse gives me an error if I put this in the header.
-//TODO: Why not use a struct file? And each process is meant to have a SET
-//      of independednt file descriptors (not inherited by child processed).
+/* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
+ * has a list of proc_files to represent the file descriptors it has open. Two
+ * different proc_files (even open in the same process) can have the same file
+ * member, but a different fd, due to it being opened twice. */
 struct proc_file {
   struct file *file;
-  int fd;
+  int* fd;
   struct list_elem file_elem;
 };
-
 
 void
 syscall_init (void) 
@@ -54,11 +54,10 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  //TODO: Must check that we can READ supplied user memory ptr here
-  //Only check if we can WRITE if the system call requires writing
-  //If check fails, must terminate process (exit??) and free its resources
-  //check_mem_ptr((const void *)f->esp);
-  //^^THIS IS NOW CHECK IN get_word_on_stack()
+  /* Check to see that we can read supplied user memory pointer, using the
+     check_mem_ptr helper() function, in get_word_from_stack(). If the
+     check fails, the process is terminated. */
+  //TODO: Do we need to check when writing? (Just when doing f->eax = ...??)
 
 	int syscall_number = (int)get_word_on_stack(f, 0);
 
@@ -113,7 +112,7 @@ syscall_handler (struct intr_frame *f)
 		case SYS_SEEK:
 			int fd             = (int)get_word_on_stack(f, 1);
 			unsigned position  = (int)get_word_on_stack(f, 2);
-			seek(fd, position);
+			sys_seek(fd, position);
 			break;
 		case SYS_TELL:
 			int fd        = (int)get_word_on_stack(f, 1);
@@ -155,8 +154,8 @@ sys_exit(int status) {
 
 }
 
-//TODO: Pretty sure we cannot return from exec until we know whether child has
-//      loaded successfully or not, although spec says we need to use
+//TODO: Pretty sure we already cannot return from exec until we know whether
+//      child has loaded successfully or not, although spec says we need to use
 //      synchronisation to ensure this (which is why the lock stuff is
 //      commented out).
 //TODO: Is the new process set as the child of the current thread already (in
@@ -202,13 +201,21 @@ sys_remove(const char *file) {
 
 }
 
+/* Opens specified file. Returns its file descriptor. Same file opened
+   multiple times returns different file descriptors. A process has an
+   independent set of file descriptors (files open in that process). fd = 0 is
+   STDIN_FILENO, fd = 1 is STDOUT_FILENO - These are never returned here.
+   If file could not be opened, -1 is returned. */
 static int
 sys_open(const char *file) {
 	lock_acquire(&secure_file);
 	struct file *fl = filesys_open(file);
+	if (fl == NULL) {
+	  return -1;
+	}
 	check_valid_file(fl);
 	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
-	list_push_front(&thread_current()->files, &f->file_elem); //TODO: So is a files member in struct thread the list of files that are OPEN?
+	list_push_front(&thread_current()->files, &f->file_elem);
 	f->file = fl;
 	int file_descriptor = -1 ; //TODO: How do we assign a fd?
 	f->fd = file_descriptor;
@@ -217,6 +224,7 @@ sys_open(const char *file) {
 	return file_descriptor;
 }
 
+/* Returns size, in bytes, of file open as 'fd'. */
 static int
 sys_filesize(int fd) {
 	lock_acquire(&secure_file);
@@ -226,8 +234,12 @@ sys_filesize(int fd) {
 	return length;
 }
 
+/* Reads 'size' bytes from file open as fd into buffer. Returns number of
+   bytes actually read - 0 at end of file, or -1 if file could not be read.
+   fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
+  //TODO: Do we need to check fd is valid?
   int bytes;
 	lock_acquire(&secure_file);
 	if (fd == 0) {
@@ -236,7 +248,7 @@ sys_read(int fd, void *buffer, unsigned size) {
 	  for (i = 0; i < size; i++) {
 	    keys[size] = input_getc();
 	  }
-	  // TODO: Not sure what to do with the keys pressed found using input_getc()
+	  memcpy(buffer, (const void *) keys, size);
 	  bytes = size;
 	} else {
 	  struct file *f = get_file(fd);
@@ -275,6 +287,8 @@ sys_write(int fd, const void *buffer, unsigned size) {
 
 }
 
+/* Changes the next byte to be read or written in open file 'fd' to
+   'position' (in bytes, from start of file). */
 static void
 sys_seek(int fd, unsigned position) {
 	lock_acquire(&secure_file);
@@ -284,6 +298,8 @@ sys_seek(int fd, unsigned position) {
 	lock_release(&secure_file);
 }
 
+/* Returns the position of the next byte to be read or written in open
+   file 'fd' (in bytes, from start of file). */
 unsigned
 sys_tell(int fd) {
 	lock_acquire(&secure_file);
@@ -292,9 +308,11 @@ sys_tell(int fd) {
 	int position = file_tell(f);
 	lock_release(&secure_file);
 	return position;
-
 }
 
+//TODO: Do we need to actually close all open file descriptors?
+//      Or is it already done? Spec is a bit vague...
+/* Closes file descriptor fd. */
 static void
 sys_close(int fd) {
 	lock_acquire(&secure_file);
@@ -312,7 +330,7 @@ sys_close(int fd) {
 }
 
 /* Returns the file corresponding the supplied file descriptor
-   'in the current thread\s list of files that it can see. */
+   'in the current thread's list of files that it can see. */
 struct file* get_file(int fd) {
 	struct thread *cur = thread_current();
 	struct list_elem *e;
@@ -331,12 +349,13 @@ struct file* get_file(int fd) {
    Only aligned word access is possible because the stack pointer is cast
    from a (void *) to a (uint32_t *). */
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
-
   check_mem_ptr(f->esp);
   check_mem_ptr(f->esp + offset);
-  return *((uint32_t *)(f->esp) + offset); //TODO: Is uint32_t correct?
+  return *((uint32_t *)(f->esp) + offset);
 }
 
+/* If supplied pointer is a null pointer, not in the user address space, or
+   is an unmapped virtual address, the process is terminated. */
 static void
 check_mem_ptr(const void *uaddr) {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
@@ -345,7 +364,9 @@ check_mem_ptr(const void *uaddr) {
   }
 }
 
-// PRE: We have acquired the lock to file system.
+//TODO: What does this do? It won't stop the function that called this from
+//      running, it will just release the lock, so it can be interrupted.
+/* PRE: We have acquired the lock to file system. */
 void
 check_valid_file(struct file *f) {
 	if (!f) {

@@ -131,8 +131,8 @@ struct thread
 
     struct thread *parent;
     int exit_status;
-    struct list files;                 /* List of files that a thread sees. */
-
+    struct list files;            /* List of files that a thread has open (Same
+                                     file can be open with different fd). */
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };
