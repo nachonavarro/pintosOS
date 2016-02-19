@@ -830,6 +830,10 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->timer_wait_sema, 0);
   t->magic = THREAD_MAGIC;
 
+  /* First file descriptor for a process' open file is 2, as 0 and 1 are
+     reserved for input and output, respectively. */
+  t->next_file_descriptor = 2;
+
   if (thread_mlfqs) {
 
     /* Set initial threads niceness and recent_cpu to 0. */

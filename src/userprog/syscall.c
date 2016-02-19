@@ -212,11 +212,15 @@ sys_open(const char *file) {
     lock_release(&secure_file);
 	  return -1;
 	}
+	struct thread *t = thread_current();
 	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
-	list_push_front(&thread_current()->files, &f->file_elem);
+	list_push_front(&t->files, &f->file_elem);
 	f->file = fl;
-	int file_descriptor = -1 ; //TODO: How do we assign a fd?
+	int file_descriptor =t->next_file_descriptor;
 	f->fd = file_descriptor;
+	/* Increment next_file_descirptor so that the next file to be
+	   opened has a different file descriptor. */
+	t->next_file_descriptor++;
 	lock_release(&secure_file);
 
 	return file_descriptor;

@@ -133,6 +133,10 @@ struct thread
     int exit_status;
     struct list files;            /* List of files that a thread has open (Same
                                      file can be open with different fd). */
+    int next_file_descriptor;     /* Next file to be opened by this
+                                     process/thread will take this as its'
+                                     file descriptor. Incremented after a
+                                     file is opened. */
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };
