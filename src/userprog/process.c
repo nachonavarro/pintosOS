@@ -14,6 +14,7 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -21,36 +22,82 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+static struct process_info* parse_filename_and_args(const char* file_name_and_args);
+static void push_arguments_on_stack(struct process_info *process_to_start, void **esp);
+static void put_string_in_stack(void **esp, char *string);
+static void put_uint_in_stack(void **esp, uint32_t n);
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *file_name_and_args) 
 {
-  char *fn_copy;
+  ASSERT(strlen(file_name_and_args) > 0);
+
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  struct process_info *process = parse_filename_and_args(file_name_and_args);
+
+  if (process == NULL) 
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
+
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (process); 
   return tid;
+}
+
+static struct process_info*
+parse_filename_and_args (const char* file_name_and_args)
+{
+
+  struct process_info *p = palloc_get_page(0);
+
+  /* Create copy of file name and args string */
+  char* name_args_copy = malloc(strlen(file_name_and_args)+1);
+  strlcpy(name_args_copy, file_name_and_args, strlen(file_name_and_args)+1);
+
+  /* Declaring helper pointer for strtok_r method */
+  char *save_ptr;
+  char *token;
+
+  /* Create an array of strings with arguments */
+  p->number_of_args = 0;
+
+  for (token = strtok_r(name_args_copy, " ", &save_ptr); 
+       token != NULL; 
+       token = strtok_r(NULL, " ", &save_ptr))
+  {
+    if (token == NULL)
+      break;
+    
+    p->args[p->number_of_args] = token;
+    p->number_of_args++;
+  }
+
+
+  p->filename = p->args[0];
+  p->number_of_args--;
+
+  for (int i = 0; i < p->number_of_args; i++) 
+  {
+    p->args[i] = p->args[i+1];
+  }
+
+  return p;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *process)
 {
-  char *file_name = file_name_;
+
+  struct process_info *process_to_start = process;
   struct intr_frame if_;
   bool success;
 
@@ -59,10 +106,12 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (process_to_start->filename, &if_.eip, &if_.esp);
+
+  push_arguments_on_stack(process_to_start, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  palloc_free_page (process_to_start->filename);
   if (!success) 
     thread_exit ();
 
@@ -76,6 +125,63 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
+static void 
+push_arguments_on_stack(struct process_info *process_to_start, void **esp)
+{
+  // TODO: Round stack pointer down to multiple of 4 before first push 
+  // (for efficiency)
+
+  /* Pushing arguments to the stack in reverse order */
+  for (int j = process_to_start->number_of_args; j > 0; j--) 
+  {
+    put_string_in_stack(esp, process_to_start->args[j-1]);
+  }
+
+  // TODO: Round stack pointer down to multiple of 4 before first push 
+  // (for efficiency)
+
+  // TODO: Try pushing NULL value?
+  /* Pushing null pointer sentinel */
+  put_uint_in_stack(esp, 0);
+
+  /* Pushing pointers to the arguments in reverse order */
+  for (int k = process_to_start->number_of_args; k > 0; k--) 
+  {
+    put_uint_in_stack(esp, (uint32_t) &(process_to_start->args[k-1]));
+  }
+
+  /* Pushing pointer to the first pointer */
+  put_uint_in_stack(esp, (uint32_t) &(process_to_start->args));
+
+  /* Pushing number of arguments */
+  put_uint_in_stack(esp, (uint32_t) process_to_start->number_of_args);
+
+  /* Pushing fake return address */
+  put_uint_in_stack(esp, 0);
+
+  // TODO: Use hex_dump()
+}
+
+
+// TODO: Make the pointer helper functions work!!
+
+void
+put_string_in_stack (void **esp, char *string)
+{
+  int str_length = strlen(string) + 1;
+  *esp -= str_length;
+  memcpy(*esp, string, str_length);
+}
+
+//TODO: Use pointer to int?
+void
+put_uint_in_stack (void **esp, uint32_t n) 
+{
+  *esp -= sizeof(uint32_t);
+  *((uint32_t*) *esp) = n;
+}
+
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -85,6 +191,8 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+
+
 int
 process_wait (tid_t child_tid UNUSED) 
 {
@@ -440,8 +548,10 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success) 
+      {
         *esp = PHYS_BASE;
+      }
       else
         palloc_free_page (kpage);
     }
