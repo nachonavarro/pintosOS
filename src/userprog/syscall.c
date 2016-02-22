@@ -7,6 +7,10 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "userprog/process.h"
+#include "devices/shutdown.h"
+#include "devices/input.h"
+#include "threads/malloc.h"
+#include "lib/string.h"
 
 struct lock secure_file;
 
@@ -14,7 +18,7 @@ static void syscall_handler (struct intr_frame *);
 static void sys_halt(void);
 static void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
-static void sys_wait(void);
+static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
 static bool sys_remove(const char *file);
 static int sys_open(const char *file);
@@ -31,12 +35,12 @@ static void check_mem_ptr(const void *uaddr);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 
 /* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
- * has a list of proc_files to represent the file descriptors it has open. Two
- * different proc_files (even open in the same process) can have the same file
- * member, but a different fd, due to it being opened twice. */
+   has a list of proc_files to represent the file descriptors it has open. Two
+   different proc_files (even open in the same process) can have the same file
+   member, but a different fd, due to it being opened twice. */
 struct proc_file {
   struct file *file;
-  int* fd;
+  int fd;
   struct list_elem file_elem;
 };
 
@@ -59,65 +63,97 @@ syscall_handler (struct intr_frame *f)
 
 	switch(syscall_number) {
 		case SYS_HALT:
+		{
 			sys_halt();
 			break;
+		}
 		case SYS_EXIT:
+		{
 			int status = (int)get_word_on_stack(f, 1);
 			sys_exit(status);
 			/* Returns exit status to the kernel. */
 			f->eax = status;
 			break;
+		}
 		case SYS_EXEC:
+		{
 			pid_t pid = sys_exec("const char *cmd_line"); //TODO: Not sure where to get this from
 			/* Returns new processes pid. */
 			f->eax = pid;
 			break;
+		}
 		case SYS_WAIT:
-			sys_wait();
+		{
+		  pid_t pid = (pid_t)get_word_on_stack(f, 1);
+		  /* Returns child's exit staus (pid argument is pid of this child). */
+			f->eax = sys_wait(pid);
 			break;
+		}
 		case SYS_CREATE:
+		{
 			const char *filename  = (const char *)get_word_on_stack(f, 1);
 			unsigned initial_size = (unsigned)get_word_on_stack(f, 2);
 			/* Returns true to the kernel if creation is successful. */
 			f->eax = (int)sys_create(filename, initial_size);
 			break;
+		}
 		case SYS_REMOVE:
+		{
 			const char *filename = (const char *)get_word_on_stack(f, 1);
 			f->eax = sys_remove(filename);
 			break;
+		}
 		case SYS_OPEN:
+		{
 			const char *filename = (const char *)get_word_on_stack(f, 1);
 			f->eax = sys_open(filename);
 			break;
+		}
 		case SYS_FILESIZE:
+		{
 			int fd = (int)get_word_on_stack(f, 1);
 			f->eax = sys_filesize(fd);
 			break;
+		}
 		case SYS_READ:
+		{
 			int fd        = (int)get_word_on_stack(f, 1);
 			void *buffer  = (void *)get_word_on_stack(f, 2);
 			unsigned size = (unsigned)get_word_on_stack(f, 3);
 			f->eax = sys_read(fd, buffer, size);
 			break;
+		}
 		case SYS_WRITE:
+		{
 			int fd        = (int)get_word_on_stack(f, 1);
 			void *buffer  = (void *)get_word_on_stack(f, 2);
 			unsigned size = (unsigned)get_word_on_stack(f, 3);
 			f->eax = sys_write(fd, buffer, size);
 			break;
+		}
 		case SYS_SEEK:
+		{
 			int fd             = (int)get_word_on_stack(f, 1);
 			unsigned position  = (int)get_word_on_stack(f, 2);
 			sys_seek(fd, position);
 			break;
+		}
 		case SYS_TELL:
+		{
 			int fd        = (int)get_word_on_stack(f, 1);
 			f->eax = sys_tell(fd);
 			break;
+		}
 		case SYS_CLOSE:
-			sys_close();
+		{
+		  int fd        = (int)get_word_on_stack(f, 1);
+			sys_close(fd);
 			break;
-		default: NOT_REACHED();
+		}
+		default:
+		{
+		  NOT_REACHED();
+		}
 	}
 
 }
@@ -131,19 +167,15 @@ sys_halt(void) {
 }
 
 /* Terminates the current user program. If the processes parent waits for it,
-   this status will be returned to the parent (This is what the parent is
-   waiting for). Status of 0 indicates success, and anything else indicates
+   this status will be returned to the parent (Parent looks at child's
+   exit status). Status of 0 indicates success, and anything else indicates
    an error. After this function is called in syscall_handler(), the exit
    status is sent ('returned') to the kernel. */
 static void
 sys_exit(int status) {
 
 	struct thread *cur = thread_current();
-	//TODO: Not sure if parent thread will wake up, or if this is the correct
-	//      way to return the status to the parent.
-	if (cur->parent != NULL) {
-		cur->parent->exit_status = status;
-	}
+	cur->exit_status = status;
 	/* Process termination message, printing process' name and exit status. */
 	printf("%s: exit(%d) \n", cur->name, status);
 	thread_exit();
@@ -160,7 +192,8 @@ sys_exit(int status) {
    well. Returns the new process' pid. Returns -1 if the process could not
    load or run for some reason, which is returned from process_execute().
    After this function is called in syscall_handler(), the new process' id
-   is sent to the kernel. */
+   is sent to the kernel. Parent/Child relationship is set in
+   process_execute(). */
 static pid_t
 sys_exec(const char *cmd_line) {
 //  lock_acquire(&secure_file);
@@ -172,8 +205,16 @@ sys_exec(const char *cmd_line) {
   return pid;
 }
 
-static void
-sys_wait(void) {
+//TODO: Parent may be asked to wait for a terminated child, so I think the
+//      list of child threads can not have anything removed (The children just
+//      get their alive member set to false when they are terminated instead).
+/*  */
+static int
+sys_wait(pid_t pid UNUSED) {
+
+  for(;;) {}
+
+  return -1;
 
 }
 
@@ -245,7 +286,7 @@ sys_read(int fd, void *buffer, unsigned size) {
   int bytes;
 	lock_acquire(&secure_file);
 	if (fd == 0) {
-	  int i;
+	  unsigned i;
 	  uint8_t keys[size];
 	  for (i = 0; i < size; i++) {
 	    keys[size] = input_getc();
@@ -290,7 +331,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
     lock_release(&secure_file);
     return -1;
   }
-  int bytes = file_write(f, buffer, size);
+
   lock_release(&secure_file);
   return bytes;
 
@@ -306,20 +347,20 @@ sys_seek(int fd, unsigned position) {
     lock_release(&secure_file);
     return;
   }
-	check_valid_file(f);
 	file_seek(f, position);
 	lock_release(&secure_file);
 }
 
 /* Returns the position of the next byte to be read or written in open
    file 'fd' (in bytes, from start of file). */
-unsigned
+static unsigned
 sys_tell(int fd) {
 	lock_acquire(&secure_file);
 	struct file *f = get_file(fd);
 	if (!f) {
     lock_release(&secure_file);
-    return;
+    NOT_REACHED();
+//    return -1;
   }
 	int position = file_tell(f);
 	lock_release(&secure_file);
@@ -339,7 +380,7 @@ sys_close(int fd) {
 		struct proc_file *f = list_entry(e, struct proc_file, file_elem);
 		if (fd == f->fd) {
 			file_close(f->file);
-			list_remove(f->file_elem);
+			list_remove(&f->file_elem);
 		}
 	}
 	lock_release(&secure_file);

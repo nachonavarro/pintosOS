@@ -124,12 +124,14 @@ struct thread
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                 /* Page directory. */
-
-
+    uint32_t *pagedir;              /* Page directory. */
+    struct list children;           /* List of child threads of this thread. */
+    struct list_elem child_elem;    /* list_elem for to be put in list of
+                                       another thread's children. */
+    bool waited_on;                 /* True if thread's parent is waiting on
+                                       this thread. */
 #endif
 
-    struct thread *parent;
     int exit_status;
     struct list files;            /* List of files that a thread has open (Same
                                      file can be open with different fd). */

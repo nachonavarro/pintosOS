@@ -86,13 +86,43 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
-  //Runs in an infinite loop for now.
-  for(;;) {
-
+  struct thread *cur = thread_current();
+  /* Check that the given pid is indeed a child of the current thread. */
+  struct thread *child = NULL;
+  struct list *children = &cur->children;
+  struct list_elem *e;
+  for (e = list_begin(children); e != list_end(children); e = list_next(e)) {
+    struct thread *t = list_entry(e, struct thread, child_elem);
+    if (t->tid == child_tid) {
+      child = t;
+      break;
+    }
   }
-  return -1;
+  /* If pid does not refer to a direct child of the calling process, -1
+   is returned. */
+  if (child == NULL || child->waited_on) {
+    return -1;
+  }
+
+  /* Have changed page_fault() to set exit status to -1, so we can
+     still just return exit_status in the case that the process was
+     terminated by the kernel. */
+  //TODO: Do all kernel terminations incur a page fault???
+  child->waited_on = true;
+
+  /* Wait for child to terminate, then return it's exit status.
+     Should synchronisation be used here instead of busy waiting? */
+  //TODO: THREAD_DYING may be the wrong thing to be checking for..
+  while(child->status != THREAD_DYING) {
+    barrier();
+  }
+
+  child->waited_on = false;
+
+  return child->exit_status;
+
 }
 
 /* Free the current process's resources. */
