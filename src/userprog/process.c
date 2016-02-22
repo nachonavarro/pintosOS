@@ -53,7 +53,7 @@ process_execute (const char *file_name_and_args)
   return tid;
 }
 
-/* Takes a string of arguments and returns a struct process_info with the 
+/* Takes a string of argumy7fents and returns a struct process_info with the
    filename, args and number_of_args fields all set */
 static struct process_info*
 parse_filename_and_args (const char* file_name_and_args)
@@ -201,12 +201,7 @@ put_uint_in_stack (void **esp, uint32_t n)
    exception), returns -1.  If TID is invalid or if it was not a
    child of the calling process, or if process_wait() has already
    been successfully called for the given TID, returns -1
-   immediately, without waiting.
-
-   This function will be implemented in problem 2-2.  For now, it
-   does nothing. */
-
-
+   immediately, without waiting. */
 int
 process_wait (tid_t child_tid)
 {

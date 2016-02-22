@@ -158,6 +158,9 @@ syscall_handler (struct intr_frame *f)
 
 }
 
+//TODO: I think the if(!f) checks are redundant (after f = getfile(fd)), maybe
+//      check to see if a replacement is needed, or fix it.
+
 /* Terminates Pintos by calling shutdown_power_off().
    Should rarely be used, as some information is lost
    (such as information about possible deadlocks). */
@@ -208,14 +211,11 @@ sys_exec(const char *cmd_line) {
 //TODO: Parent may be asked to wait for a terminated child, so I think the
 //      list of child threads can not have anything removed (The children just
 //      get their alive member set to false when they are terminated instead).
-/*  */
+/* Waits for a child process pid, and then returns the child's exit status.
+   See process_wait() for more information on what exactly happens here. */
 static int
-sys_wait(pid_t pid UNUSED) {
-
-  for(;;) {}
-
-  return -1;
-
+sys_wait(pid_t pid) {
+  return process_wait((tid_t) pid);
 }
 
 /* Creates file called 'file' that is initially 'initial_size_ bytes.
