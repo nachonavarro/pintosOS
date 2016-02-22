@@ -819,6 +819,14 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
 
+#ifdef USERPROG
+  list_init(&t->children);
+  t->waited_on = false;
+  //TODO: Should we move this to process_execute?
+  /* Add child thread to list of children in parent thread. */
+  list_push_front(&thread_current()->children, &t->child_elem);
+#endif
+
   if(!thread_mlfqs) {
     t->base_priority = t->effective_priority = priority;
   }
