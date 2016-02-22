@@ -46,19 +46,22 @@ process_execute (const char *file_name_and_args)
 
   /* Declaring helper pointer for strtok_r method */
   char *save_ptr;
+  char *token;
 
   /* Finding the file name by taking the first token until a space */
   process->filename = strtok_r(name_args_copy, " ", &save_ptr);
 
 
-  // TODO: Use 'for' loop as in function comments
   /* Create an array of strings with arguments */
   process->number_of_args = 0;
-  while (strlen(name_args_copy) > 0) 
+
+  for (token = strtok_r(name_args_copy, " ", &save_ptr); 
+       token != NULL; 
+       token = strtok_r(NULL, " ", &save_ptr))
   {
-    process->args[process->number_of_args] 
-      = strtok_r(name_args_copy, " ", &save_ptr);
+    strlcpy(process->args[process->number_of_args], token, sizeof(token));
     process->number_of_args++;
+    printf ("'%s'\n", token);
   }
 
 
@@ -67,7 +70,7 @@ process_execute (const char *file_name_and_args)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, process->filename, PGSIZE);
+  strlcpy (fn_copy, process->filename, sizeof(process->filename));
 
 
   /* Create a new thread to execute FILE_NAME. */
@@ -99,13 +102,17 @@ start_process (void *process)
   if (!success) 
     thread_exit ();
 
+
+  // TODO: Round stack pointer down to multiple of 4 before first push 
+  // (for efficiency)
+
   /* Pushing arguments to the stack in reverse order */
   for (int j = process_to_start->number_of_args; j > 0; j--) 
   {
     put_string_in_stack(&if_.esp, process_to_start->args[j-1]);
   }
 
-  // TODO: Try pushing NULL value
+  // TODO: Try pushing NULL value?
   /* Pushing null pointer sentinel */
   put_int_in_stack(&if_.esp, 0);
 
@@ -121,9 +128,10 @@ start_process (void *process)
   /* Pushing number of arguments */
   put_int_in_stack(&if_.esp, process_to_start->number_of_args);
 
-  // TODO: Try pushing NULL value
   /* Pushing fake return address */
   put_int_in_stack(&if_.esp, 0);
+
+  // TODO: Use hex_dump()
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -135,13 +143,14 @@ start_process (void *process)
   NOT_REACHED ();
 }
 
+// TODO: Make the pointer helper functions work!!
 
 void
 put_string_in_stack (void **esp, char *string)
 {
   *esp--;
-  char *stack_elem_string = (char*) esp;
-  *stack_elem_string = string;
+  char *stack_elem_string = (char*) *esp;
+  stack_elem_string = string;
 }
 
 //TODO: Use pointer to int?
@@ -149,7 +158,7 @@ void
 put_int_in_stack (void **esp, int n) 
 {
   *esp--;
-  int stack_elem_int = (int) esp;
+  int stack_elem_int = (int) *esp;
   stack_elem_int = n;
 }
 
@@ -158,7 +167,7 @@ void
 put_string_ptr_in_stack (void **esp, char **string_ptr)
 {
   *esp--;
-  char **stack_elem_string_ptr = (char**) esp;
+  char **stack_elem_string_ptr = (char**) *esp;
   stack_elem_string_ptr = string_ptr;
 }
 
@@ -167,7 +176,7 @@ void
 put_ptr_to_string_ptr_in_stack (void **esp, char ***ptr_to_str_ptr)
 {
   *esp--;
-  char ***stack_elem_ptr_to_string_ptr = (char***) esp;
+  char ***stack_elem_ptr_to_string_ptr = (char***) *esp;
   stack_elem_ptr_to_string_ptr = ptr_to_str_ptr;
 }
 
