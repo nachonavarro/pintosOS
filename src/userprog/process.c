@@ -167,7 +167,9 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   }
 
   /* Pushing pointer to the first pointer */
-  put_uint_in_stack(esp, (uint32_t) &(process_to_start->args));
+  if (process_to_start->number_of_args > 0)
+    put_uint_in_stack(esp, (uint32_t) &(process_to_start->args));
+
 
   /* Pushing number of arguments */
   put_uint_in_stack(esp, (uint32_t) process_to_start->number_of_args);
