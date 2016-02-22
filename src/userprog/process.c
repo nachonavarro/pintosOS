@@ -38,8 +38,10 @@ process_execute (const char *file_name_and_args)
 
   tid_t tid;
 
+  /* Calling helper method to parse arguments and set up process_info struct */
   struct process_info *process = parse_filename_and_args(file_name_and_args);
 
+  /* In case of an error in the argument parsing */
   if (process == NULL) 
     return TID_ERROR;
 
@@ -51,38 +53,44 @@ process_execute (const char *file_name_and_args)
   return tid;
 }
 
+/* Takes a string of arguments and returns a struct process_info with the 
+   filename, args and number_of_args fields all set */
 static struct process_info*
 parse_filename_and_args (const char* file_name_and_args)
 {
 
+  /* Allocating memory for our process_info struct */
   struct process_info *p = palloc_get_page(0);
 
-  /* Create copy of file name and args string */
+  /* Create copy of file_name_and_args const string as strtok_r needs modifiable 
+     string for tokenising */
   char* name_args_copy = malloc(strlen(file_name_and_args)+1);
   strlcpy(name_args_copy, file_name_and_args, strlen(file_name_and_args)+1);
 
-  /* Declaring helper pointer for strtok_r method */
+  /* Declaring helper pointers for strtok_r method */
   char *save_ptr;
   char *token;
 
-  /* Create an array of strings with arguments */
+  /* Setting number of arguments to 0, will be updated in the for loop */
   p->number_of_args = 0;
 
+  /* Tokenising the arguments and setting them in the process_info struct */
   for (token = strtok_r(name_args_copy, " ", &save_ptr); 
        token != NULL; 
        token = strtok_r(NULL, " ", &save_ptr))
   {
-    if (token == NULL)
-      break;
-    
     p->args[p->number_of_args] = token;
     p->number_of_args++;
   }
 
 
+  /* File name is the first token */
   p->filename = p->args[0];
+
+  /* Decrementing the number of arguments and we are removing the file name */
   p->number_of_args--;
 
+  /* Decrementing the index of arguments as we have removed the file name */
   for (int i = 0; i < p->number_of_args; i++) 
   {
     p->args[i] = p->args[i+1];
@@ -108,6 +116,7 @@ start_process (void *process)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (process_to_start->filename, &if_.eip, &if_.esp);
 
+  // Push the process arguments on to the stack using a helper method */
   push_arguments_on_stack(process_to_start, &if_.esp);
 
   /* If load failed, quit. */
@@ -125,11 +134,16 @@ start_process (void *process)
   NOT_REACHED ();
 }
 
+/* Helper method which pushes a process' arguments onto the stack 
+   given a process_info struct. */
 static void 
 push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 {
-  // TODO: Round stack pointer down to multiple of 4 before first push 
-  // (for efficiency)
+  /* Rounding down the stack pointer to the nearest 
+     word multiple for faster access */
+  while (((uint32_t) *esp) % sizeof(uint32_t) != 0) {
+    (*esp)--;
+  } 
 
   /* Pushing arguments to the stack in reverse order */
   for (int j = process_to_start->number_of_args; j > 0; j--) 
@@ -137,10 +151,12 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
     put_string_in_stack(esp, process_to_start->args[j-1]);
   }
 
-  // TODO: Round stack pointer down to multiple of 4 before first push 
-  // (for efficiency)
+  /* Rounding down the stack pointer to the nearest 
+     word multiple for faster access */
+  while (((uint32_t) *esp) % sizeof(uint32_t) != 0) {
+    (*esp)--;
+  } 
 
-  // TODO: Try pushing NULL value?
   /* Pushing null pointer sentinel */
   put_uint_in_stack(esp, 0);
 
@@ -159,12 +175,10 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   /* Pushing fake return address */
   put_uint_in_stack(esp, 0);
 
-  // TODO: Use hex_dump()
+  // TODO: Use hex_dump() to test this is working!
 }
 
-
-// TODO: Make the pointer helper functions work!!
-
+/* Pushes a string onto the stack at the next location given by the stack ptr */
 void
 put_string_in_stack (void **esp, char *string)
 {
@@ -173,7 +187,7 @@ put_string_in_stack (void **esp, char *string)
   memcpy(*esp, string, str_length);
 }
 
-//TODO: Use pointer to int?
+/* Pushes a uint32_t on the stack at the next location given by the stack ptr */
 void
 put_uint_in_stack (void **esp, uint32_t n) 
 {
