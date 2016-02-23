@@ -379,7 +379,9 @@ thread_exit (void)
   }
 
   list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
+  struct thread *cur = thread_current();
+  cur->status = THREAD_DYING;
+  sema_up(cur->exit_sema);
   schedule ();
   NOT_REACHED ();
 }
@@ -836,6 +838,10 @@ init_thread (struct thread *t, const char *name, int priority)
   /* Initialise semaphore to 0 to synchronise sleeping threads. */
   t->waiting_on_lock = NULL;
   sema_init(&t->timer_wait_sema, 0);
+  /* sema_down() called on exit_sema in process_wait(). sema_up() only
+     called in thread_exit(). This means the wait system call cannot
+     return the exit status until thread has terminated. */
+  sema_init(&t->exit_sema, 0);
   t->magic = THREAD_MAGIC;
 
   /* First file descriptor for a process' open file is 2, as 0 and 1 are

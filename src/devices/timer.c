@@ -117,7 +117,7 @@ timer_sleep (int64_t ticks)
 
   /* When ticks_to_wake_on ticks have passed (Since the OS booted), this
        thread can be woken. */
-    int64_t ticks_to_wake_on = ticks + timer_ticks();
+  int64_t ticks_to_wake_on = ticks + timer_ticks();
   struct thread* cur = thread_current();
   cur->ticks_to_wake_on = ticks_to_wake_on;
 
