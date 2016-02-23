@@ -381,7 +381,7 @@ thread_exit (void)
   list_remove (&thread_current()->allelem);
   struct thread *cur = thread_current();
   cur->status = THREAD_DYING;
-  sema_up(cur->exit_sema);
+  sema_up(&cur->exit_sema);
   schedule ();
   NOT_REACHED ();
 }
@@ -825,10 +825,11 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->children);
   t->waited_on = false;
   //TODO: Should we move this to process_execute?
-  //TODO: Change as thread_current() cannot be called 
-  // before thread_init is finished!
-  //Add child thread to list of children in parent thread. 
-  // list_push_front(&thread_current()->children, &t->child_elem);
+  //      (And would this stop us having to use strcmp for
+  //      main below? Would it still work in all other cases?)
+  if (!strcmp(name, "main")) {
+    list_push_front(&thread_current()->children, &t->child_elem);
+  }
 #endif
 
   if(!thread_mlfqs) {
