@@ -827,7 +827,9 @@ init_thread (struct thread *t, const char *name, int priority)
   //TODO: Should we move this to process_execute?
   //      (And would this stop us having to use strcmp for
   //      main below? Would it still work in all other cases?)
-  if (!strcmp(name, "main")) {
+  printf("\n\nOutside if: name is %s.\n\n",name);
+  if (strcmp(name, "main") != 0) {
+    printf("\n\nInside if: name is %s.\n\n",name);
     list_push_front(&thread_current()->children, &t->child_elem);
   }
 #endif
