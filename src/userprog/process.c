@@ -215,27 +215,33 @@ process_wait (tid_t child_tid)
       break;
     }
   }
+
+  //TODO: Not sure if there will be a problem in main when process_wait is
+  //      called because of never returning.
   /* If pid does not refer to a direct child of the calling process, -1
-   is returned. */
+     is returned. -1 is also returned if wait has already been called on
+     this thread. */
   if (child == NULL || child->waited_on) {
     return -1;
   }
+
+  /* Don't need to set to false again, because the thread will be
+     terminated once it is no longer being waited on by the parent,
+     and in this case, we do not want to be able to call wait on this
+     thread. */
+  child->waited_on = true;
+
+  /* Wait for child to terminate, then return it's exit status.
+     Instead of a busy wait, give each thread a semaphore, initialised
+     to 0 on initialising thread, then try to do sema_down here, which
+     will wait until sema_up is called (in thread_exit), and then we
+     can just return exit status. */
+  sema_down(&child->exit_sema);
 
   /* Have changed page_fault() to set exit status to -1, so we can
      still just return exit_status in the case that the process was
      terminated by the kernel. */
   //TODO: Do all kernel terminations incur a page fault???
-  child->waited_on = true;
-
-  /* Wait for child to terminate, then return it's exit status.
-     Should synchronisation be used here instead of busy waiting? */
-  //TODO: THREAD_DYING may be the wrong thing to be checking for..
-  while(child->status != THREAD_DYING) {
-    barrier();
-  }
-
-  child->waited_on = false;
-
   return child->exit_status;
 
 }

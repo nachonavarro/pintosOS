@@ -128,8 +128,14 @@ struct thread
     struct list children;           /* List of child threads of this thread. */
     struct list_elem child_elem;    /* list_elem for to be put in list of
                                        another thread's children. */
-    bool waited_on;                 /* True if thread's parent is waiting on
-                                       this thread. */
+    bool waited_on;                 /* True if thread's parent has waited on
+                                       this thread. Never set to false after
+                                       being set to true, because we do not
+                                       want to be able to wait on the same
+                                       thread twice. */
+    struct semaphore exit_sema;    /* Semaphore to ensure the wait system
+                                       call will wait until the thread has
+                                       exited. Initialised to 0. */
 #endif
 
     int exit_status;
