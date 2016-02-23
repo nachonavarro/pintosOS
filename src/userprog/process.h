@@ -12,8 +12,8 @@ void process_activate (void);
 
 struct process_info {
   char *filename;
-  char **args;
-  int number_of_args;
+  char **argv;
+  int argc;
 };
 
 #endif /* userprog/process.h */

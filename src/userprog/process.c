@@ -54,38 +54,42 @@ process_execute (const char *file_name_and_args)
 }
 
 /* Takes a string of argumy7fents and returns a struct process_info with the
-   filename, args and number_of_args fields all set */
+   filename, argv and argc fields all set */
 static struct process_info*
 parse_filename_and_args (const char* file_name_and_args)
 {
 
   /* Allocating memory for our process_info struct */
-  struct process_info *p = palloc_get_page(0);
+  void *new_page = palloc_get_page(0);
+  struct process_info *p = new_page;
 
   /* Create copy of file_name_and_args const string as strtok_r needs modifiable 
      string for tokenising */
-  char* name_args_copy = malloc(strlen(file_name_and_args));
-  strlcpy(name_args_copy, file_name_and_args, strlen(file_name_and_args));
+  int arg_length = strlen(file_name_and_args) + 1;
+  void *starting_address = new_page + PGSIZE - arg_length;
+  memcpy(starting_address, file_name_and_args, arg_length);
 
   /* Declaring helper pointers for strtok_r method */
   char *save_ptr;
   char *token;
 
   /* Setting number of arguments to 0, will be updated in the for loop */
-  p->number_of_args = 0;
+  p->argc = 0;
 
   /* Tokenising the arguments and setting them in the process_info struct */
-  for (token = strtok_r(name_args_copy, " ", &save_ptr); 
-       token != NULL; 
-       token = strtok_r(NULL, " ", &save_ptr))
+  for (char *name_args_copy = starting_address; ; name_args_copy = NULL) 
   {
-    p->args[p->number_of_args] = token;
-    p->number_of_args++;
+    token = strtok_r(name_args_copy, " ", &save_ptr);
+
+    if (token == NULL) 
+      break;
+
+    p->argv[p->argc] = token;
+    p->argc++;
   }
 
-
   /* File name is the first token */
-  p->filename = p->args[0];
+  p->filename = p->argv[0];
 
   return p;
 }
@@ -111,7 +115,7 @@ start_process (void *process)
   push_arguments_on_stack(process_to_start, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (process_to_start->filename);
+  palloc_free_page (process_to_start);
   if (!success) 
     thread_exit ();
 
@@ -137,10 +141,10 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   } 
 
   /* Pushing arguments to the stack in reverse order */
-  for (int j = process_to_start->number_of_args; j > 0; j--) 
+  for (int j = process_to_start->argc; j > 0; j--) 
   {
-    put_string_in_stack(esp, process_to_start->args[j-1]);
-    process_to_start->args[j-1] = *esp;
+    put_string_in_stack(esp, process_to_start->argv[j-1]);
+    process_to_start->argv[j-1] = *esp;
   }
 
   /* Rounding down the stack pointer to the nearest 
@@ -153,9 +157,9 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   put_uint_in_stack(esp, 0);
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = process_to_start->number_of_args; k > 0; k--) 
+  for (int k = process_to_start->argc; k > 0; k--) 
   {
-    put_uint_in_stack(esp, (uint32_t) process_to_start->args[k-1]);
+    put_uint_in_stack(esp, (uint32_t) process_to_start->argv[k-1]);
   }
 
   /* Pushing pointer to the first pointer */
@@ -163,12 +167,13 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 
 
   /* Pushing number of arguments */
-  put_uint_in_stack(esp, process_to_start->number_of_args);
+  put_uint_in_stack(esp, process_to_start->argc);
 
   /* Pushing fake return address */
   put_uint_in_stack(esp, 0);
 
   // TODO: Use hex_dump() to test this is working!
+  // hex_dump(if_.esp,if_.esp,size,true);
 }
 
 /* Pushes a string onto the stack at the next location given by the stack ptr */
