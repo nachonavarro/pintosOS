@@ -64,8 +64,8 @@ parse_filename_and_args (const char* file_name_and_args)
 
   /* Create copy of file_name_and_args const string as strtok_r needs modifiable 
      string for tokenising */
-  char* name_args_copy = malloc(strlen(file_name_and_args)+1);
-  strlcpy(name_args_copy, file_name_and_args, strlen(file_name_and_args)+1);
+  char* name_args_copy = malloc(strlen(file_name_and_args));
+  strlcpy(name_args_copy, file_name_and_args, strlen(file_name_and_args));
 
   /* Declaring helper pointers for strtok_r method */
   char *save_ptr;
@@ -86,15 +86,6 @@ parse_filename_and_args (const char* file_name_and_args)
 
   /* File name is the first token */
   p->filename = p->args[0];
-
-  /* Decrementing the number of arguments and we are removing the file name */
-  p->number_of_args--;
-
-  /* Decrementing the index of arguments as we have removed the file name */
-  for (int i = 0; i < p->number_of_args; i++) 
-  {
-    p->args[i] = p->args[i+1];
-  }
 
   return p;
 }
@@ -149,6 +140,7 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   for (int j = process_to_start->number_of_args; j > 0; j--) 
   {
     put_string_in_stack(esp, process_to_start->args[j-1]);
+    process_to_start->args[j-1] = *esp;
   }
 
   /* Rounding down the stack pointer to the nearest 
@@ -163,16 +155,15 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   /* Pushing pointers to the arguments in reverse order */
   for (int k = process_to_start->number_of_args; k > 0; k--) 
   {
-    put_uint_in_stack(esp, (uint32_t) &(process_to_start->args[k-1]));
+    put_uint_in_stack(esp, (uint32_t) process_to_start->args[k-1]);
   }
 
   /* Pushing pointer to the first pointer */
-  if (process_to_start->number_of_args > 0)
-    put_uint_in_stack(esp, (uint32_t) &(process_to_start->args));
+  put_uint_in_stack(esp, (uint32_t) *esp);
 
 
   /* Pushing number of arguments */
-  put_uint_in_stack(esp, (uint32_t) process_to_start->number_of_args);
+  put_uint_in_stack(esp, process_to_start->number_of_args);
 
   /* Pushing fake return address */
   put_uint_in_stack(esp, 0);
