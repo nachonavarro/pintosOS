@@ -208,9 +208,9 @@ sys_exec(const char *cmd_line) {
   /* Identity mapping between thread id and process id, because
      Pintos is not multithreaded. */
   pid_t pid = (pid_t)process_execute(cmd_line);
-  struct thread *cur = thread_current();
-  sema_down(thread_current->exec_sema);
-  if (!)
+//  struct thread *cur = thread_current();
+//  sema_down(thread_current->exec_sema);
+//  if (!)
 //  lock_release(&secure_file);
 
   return pid;
@@ -266,7 +266,7 @@ sys_open(const char *file) {
   struct file *fl = filesys_open(file);
   if (fl == NULL) {
       lock_release(&secure_file);
-      sys_exit(-1);
+      return -1;
   }
   struct thread *t = thread_current();
   struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
