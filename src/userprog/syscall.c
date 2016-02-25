@@ -290,8 +290,7 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
-//  struct file *f = get_file(fd);
-//  check_mem_ptr(get_file(fd));
+  check_mem_ptr(buffer);
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 0) {
