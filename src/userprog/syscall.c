@@ -13,6 +13,7 @@
 #include "threads/malloc.h"
 #include "lib/string.h"
 
+/* Ensures multiple threads cannot call file system code at the same time. */
 struct lock secure_file;
 
 static void syscall_handler (struct intr_frame *);
@@ -104,18 +105,22 @@ syscall_handler (struct intr_frame *f)
     case SYS_REMOVE:
     {
       const char *filename = (const char *)get_word_on_stack(f, 1);
+      /* Returns true if successful, and false otherwise. */
       f->eax = sys_remove(filename);
       break;
     }
     case SYS_OPEN:
     {
       const char *filename = (const char *)get_word_on_stack(f, 1);
+      /* Returns file descriptor of opened file, or -1 if it could not
+         be opened. */
       f->eax = sys_open(filename);
       break;
     }
     case SYS_FILESIZE:
     {
       int fd = (int)get_word_on_stack(f, 1);
+      /* Returns size of file in bytes. */
       f->eax = sys_filesize(fd);
       break;
     }
@@ -124,6 +129,8 @@ syscall_handler (struct intr_frame *f)
       int fd        = (int)get_word_on_stack(f, 1);
       void *buffer  = (void *)get_word_on_stack(f, 2);
       unsigned size = (unsigned)get_word_on_stack(f, 3);
+      /* Returns number of bytes actually read, or -1 if it could not
+         be read. */
       f->eax = sys_read(fd, buffer, size);
       break;
     }
@@ -132,6 +139,7 @@ syscall_handler (struct intr_frame *f)
       int fd        = (int)get_word_on_stack(f, 1);
       void *buffer  = (void *)get_word_on_stack(f, 2);
       unsigned size = (unsigned)get_word_on_stack(f, 3);
+      /* Returns number of bytes written. */
       f->eax = sys_write(fd, buffer, size);
       break;
     }
@@ -145,6 +153,8 @@ syscall_handler (struct intr_frame *f)
     case SYS_TELL:
     {
       int fd        = (int)get_word_on_stack(f, 1);
+      /* Returns the position of the next byte to be read or written in open
+         file 'fd' (in bytes, from start of file). */
       f->eax = sys_tell(fd);
       break;
     }
@@ -161,9 +171,6 @@ syscall_handler (struct intr_frame *f)
   }
 
 }
-
-//TODO: I think the if(!f) checks are redundant (after f = getfile(fd)), maybe
-//      check to see if a replacement is needed, or fix it.
 
 /* Terminates Pintos by calling shutdown_power_off().
    Should rarely be used, as some information is lost
@@ -189,25 +196,19 @@ sys_exit(int status) {
 
 }
 
-//TODO: Pretty sure we already cannot return from exec until we know whether
-//      child has loaded successfully or not, although spec says we need to use
-//      synchronisation to ensure this (which is why the lock stuff is
-//      commented out).
-//TODO: Is the new process set as the child of the current thread already (in
-//      process_execute())? Or do we need to do it here?
 /* Runs the executable given in cmd_line. cmd_line includes the arguments as
    well. Returns the new process' pid. Returns -1 if the process could not
-   load or run for some reason, which is returned from process_execute().
-   After this function is called in syscall_handler(), the new process' id
-   is sent to the kernel. Parent/Child relationship is set in
-   process_execute(). */
+   load or run for some reason. After this function is called in
+   syscall_handler(), the new process' id is sent to the kernel. Parent/Child
+   relationship is set in process_execute(). */
 static pid_t
 sys_exec(const char *cmd_line) {
   check_mem_ptr(cmd_line);
-//  lock_acquire(&secure_file);
+
   /* Identity mapping between thread id and process id, because
      Pintos is not multithreaded. */
   pid_t pid = (pid_t)process_execute(cmd_line);
+
   /* We want to wait until the child has definitely loaded, and then check to
      see whether it has loaded or not (e.g. whether the filename was invalid).
      exec_sema is initialised to 0 for a thread. We use exec_sema of the child
@@ -227,9 +228,6 @@ sys_exec(const char *cmd_line) {
   return pid;
 }
 
-//TODO: Parent may be asked to wait for a terminated child, so I think the
-//      list of child threads can not have anything removed (The children just
-//      get their alive member set to false when they are terminated instead).
 /* Waits for a child process pid, and then returns the child's exit status.
    See process_wait() for more information on what exactly happens here. */
 static int
@@ -245,6 +243,7 @@ sys_create(const char *file, unsigned initial_size) {
   if (file == NULL) {
     sys_exit(-1);
   }
+
   lock_acquire(&secure_file);
   bool success = filesys_create(file, initial_size);
   lock_release(&secure_file);
@@ -273,21 +272,27 @@ sys_open(const char *file) {
   if (file == NULL) {
     sys_exit(-1);
   }
+
   lock_acquire(&secure_file);
+
   struct file *fl = filesys_open(file);
   if (fl == NULL) {
     lock_release(&secure_file);
     return -1;
   }
+
   struct thread *t = thread_current();
-  struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
+  /* Freed in sys_close(). */
+  struct proc_file *f = malloc(sizeof(struct proc_file));
   list_push_front(&t->files, &f->file_elem);
   f->file = fl;
-  int file_descriptor =t->next_file_descriptor;
+
+  int file_descriptor = t->next_file_descriptor;
   f->fd = file_descriptor;
   /* Increment next_file_descirptor so that the next file to be
      opened has a different file descriptor. */
   t->next_file_descriptor++;
+
   lock_release(&secure_file);
 
   return file_descriptor;
@@ -297,6 +302,7 @@ sys_open(const char *file) {
 static int
 sys_filesize(int fd) {
   check_fd(fd);
+
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   int length = file_length(f);
@@ -314,15 +320,22 @@ sys_read(int fd, void *buffer, unsigned size) {
   }
   check_fd(fd);
   check_buffer(buffer, size);
+
   int bytes;
+
   lock_acquire(&secure_file);
+
+  /* fd = 0 corresponds to reading from stdin. */
   if (fd == 0) {
     unsigned i;
     uint8_t keys[size];
+    /* Make an array of keys pressed. */
     for (i = 0; i < size; i++) {
       keys[size] = input_getc();
     }
+    /* Put these keys pressed into the buffer. */
     memcpy(buffer, (const void *) keys, size);
+    /* Must have successfully read all bytes we were told to. */
     bytes = size;
   } else {
     struct file *f = get_file(fd);
@@ -343,26 +356,34 @@ sys_read(int fd, void *buffer, unsigned size) {
    bytes already written. fd = 1 writes to the console. */
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
+
   if (fd == 0) {
     sys_exit(-1);
   }
-  //printf("HELLOOOO\n");
-  //printf("%p", buffer);
+
   if (buffer == NULL || !is_user_vaddr(buffer)
       || pagedir_get_page(thread_current()->pagedir, buffer) == NULL) {
     sys_exit(-1);
   }
+
   check_fd(fd);
   check_buffer(buffer, size);
+
   int bytes;
   lock_acquire(&secure_file);
+
+  /* fd = 1 corresponds to writing to stdout. */
   if (fd == 1) {
-    if (size < 300) {
+    /* If we are writing a fairly large amount of bytes to stdout, write
+       MAX_CONSOLE_WRITE bytes per call to putbuf(), then write the rest
+       of the bytes, calling sys_write() recursively. */
+    if (size < MAX_CONSOLE_WRITE) {
       putbuf(buffer, size);
     } else {
-      putbuf(buffer, 300);
-      sys_write(fd, buffer, size - 300);
+      putbuf(buffer, MAX_CONSOLE_WRITE);
+      sys_write(fd, buffer, size - MAX_CONSOLE_WRITE);
     }
+    /* Must have successfully written all bytes we were told to. */
     bytes = size;
   } else {
     struct file *f = get_file(fd);
@@ -374,6 +395,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
   }
 
   lock_release(&secure_file);
+
   return bytes;
 
 }
@@ -383,6 +405,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
 static void
 sys_seek(int fd, unsigned position) {
   check_fd(fd);
+
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   if (!f) {
@@ -398,6 +421,7 @@ sys_seek(int fd, unsigned position) {
 static unsigned
 sys_tell(int fd) {
   check_fd(fd);
+
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   if (!f) {
@@ -406,11 +430,12 @@ sys_tell(int fd) {
   }
   int position = file_tell(f);
   lock_release(&secure_file);
+
   return position;
 }
 
-//TODO: Do we need to actually close all open file descriptors?
-//      Or is it already done? Spec is a bit vague...
+//TODO: Do we need to actually close all its open files?
+//      Or is it already done in file_close? Spec is a bit vague...
 /* Closes file descriptor fd. */
 static void
 sys_close(int fd) {
@@ -418,6 +443,9 @@ sys_close(int fd) {
   lock_acquire(&secure_file);
   struct thread *cur = thread_current();
   struct list_elem *e;
+  /* Cannot use get_file() in place of the below for loop, because we need
+     access to the file_elem, which is in the struct proc_file, not the
+     struct file. */
   for (e = list_begin (&cur->files); e != list_end (&cur->files);
        e = list_next (e)) {
     struct proc_file *f = list_entry(e, struct proc_file, file_elem);
@@ -470,6 +498,7 @@ check_mem_ptr(const void *uaddr)
   }
 }
 
+/* Checks that all of the buffer that we are writing/reading from is valid. */
 static void
 check_buffer(void *buffer, unsigned size)
 {
@@ -481,6 +510,8 @@ check_buffer(void *buffer, unsigned size)
 	}
 }
 
+/* Checks that the given file descriptor is valid. File descriptors cannot
+   be less than 0. */
 static void
 check_fd(int fd) {
   struct thread *cur = thread_current();

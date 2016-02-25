@@ -10,6 +10,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 
+/* Struct holding all information needed to start a process. */
 struct process_info {
   char *filename;
   int argc;

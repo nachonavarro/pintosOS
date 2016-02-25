@@ -136,8 +136,17 @@ struct thread
     struct semaphore exit_sema;    /* Semaphore to ensure the wait system
                                        call will wait until the thread has
                                        exited. Initialised to 0. */
-    struct semaphore load_sema;
-    bool loaded;
+    struct semaphore load_sema;    /* Semaphore to ensure the exec system call
+                                      does not check to see if the child has
+                                      successfully loaded until it has tried
+                                      to be loaded. */
+    bool loaded;                   /* Set to the return value of load() in
+                                      start_process(), so that sys_exec() can
+                                      check whether the child loaded
+                                      successfully or not, as if not, -1 should
+                                      be returned from sys_exec(). loaded is
+                                      set to false when the thread is
+                                      created. */
 #endif
 
     int exit_status;

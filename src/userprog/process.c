@@ -47,16 +47,16 @@ process_execute (const char *file_name_and_args)
   if (process == NULL) {
     return TID_ERROR;
   }
-//  if (filesys_open(process->filename) == NULL) {
-//    return TID_ERROR;
-//  }
-//  filesys_remove(process->filename);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
 
+  /* If thread could not be created, free the page allocated for the
+     process. */
   if (tid == TID_ERROR) {
     palloc_free_page (process);
   }
+
   return tid;
 
 }
@@ -131,18 +131,24 @@ start_process (void *process)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (process_to_start->filename, &if_.eip, &if_.esp);
+
+  /* Set the current thread's 'loaded' member to the return value from load,
+     and then call sema_up on the thread's load_sema, so that sys_exec knows
+     to now check whether the process has loaded successfully or not. */
   struct thread *cur = thread_current();
   cur->loaded = success;
   sema_up(&cur->load_sema);
 
-  // Push the process arguments on to the stack using a helper method */
+  /* Push the process arguments on to the stack using a helper method, if
+     the process successfully loaded. */
   if (success) {
     push_arguments_on_stack(process_to_start, &if_.esp);
   }
 
-  /* If load failed, quit. */
+  /* No longer need this page, as all required information is on the stack. */
   palloc_free_page (process_to_start);
 
+  /* If load failed, quit. */
   if (!success) {
     thread_exit ();
   }
@@ -162,13 +168,8 @@ start_process (void *process)
 static void 
 push_arguments_on_stack(struct process_info *p, void **esp)
 {
-
-//  int argc = process_to_start->argc;
-//  char *argv[] = process_to_start->argv;
-
   /* Pushing arguments to the stack in reverse order */
-  for (int j = p->argc; j > 0; j--)
-  {
+  for (int j = p->argc; j > 0; j--) {
     put_string_in_stack(esp, p->argv[j-1]);
     p->argv[j-1] = *esp;
   }
@@ -183,8 +184,7 @@ push_arguments_on_stack(struct process_info *p, void **esp)
   put_uint_in_stack(esp, 0);
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = p->argc; k > 0; k--)
-  {
+  for (int k = p->argc; k > 0; k--) {
     put_uint_in_stack(esp, (uint32_t) p->argv[k-1]);
   }
 
@@ -263,6 +263,10 @@ process_wait (tid_t child_tid)
      will wait until sema_up is called (in thread_exit), and then we
      can just return exit status. */
   sema_down(&child->exit_sema);
+
+  /* Don't remove from the terminated child from the parents list of children,
+     because we still want to be able to check to see if we have already called
+     wait on this child. */
 
   /* Have changed page_fault() to set exit status to -1, so we can
      still just return exit_status in the case that the process was
