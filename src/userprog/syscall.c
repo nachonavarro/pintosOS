@@ -242,7 +242,6 @@ sys_remove(const char *file) {
   bool success = filesys_remove(file);
   lock_release(&secure_file);
   return success;
-
 }
 
 /* Opens specified file. Returns its file descriptor. Same file opened
@@ -291,8 +290,8 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
-  struct file *f = get_file(fd);
-  check_mem_ptr(get_file(fd));
+//  struct file *f = get_file(fd);
+//  check_mem_ptr(get_file(fd));
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 0) {
@@ -307,6 +306,7 @@ sys_read(int fd, void *buffer, unsigned size) {
     lock_release(&secure_file);
     return -1;
   } else {
+    struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
       return -1;
