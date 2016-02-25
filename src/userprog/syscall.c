@@ -223,7 +223,7 @@ sys_wait(pid_t pid) {
    Returns true if successful. Creating a file does NOT open it. */
 static bool
 sys_create(const char *file, unsigned initial_size) {
-  check_mem_ptr(file);
+  //check_mem_ptr(file);
   if (file == NULL) {
     sys_exit(-1);
   }
@@ -252,7 +252,7 @@ sys_remove(const char *file) {
    If file could not be opened, -1 is returned. */
 static int
 sys_open(const char *file) {
-  check_mem_ptr(file);
+  //check_mem_ptr(file);
   if (file == NULL) {
     sys_exit(-1);
   }
@@ -291,8 +291,8 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
-  struct file *f = get_file(fd);
-  check_mem_ptr(get_file(fd));
+//  struct file *f = get_file(fd);
+  //check_mem_ptr(get_file(fd));
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 0) {
@@ -307,6 +307,7 @@ sys_read(int fd, void *buffer, unsigned size) {
     lock_release(&secure_file);
     return -1;
   } else {
+	struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
       return -1;
@@ -371,8 +372,7 @@ sys_tell(int fd) {
   struct file *f = get_file(fd);
   if (!f) {
     lock_release(&secure_file);
-    NOT_REACHED();
-//    return -1;
+    sys_exit(-1);
   }
   int position = file_tell(f);
   lock_release(&secure_file);
@@ -393,6 +393,8 @@ sys_close(int fd) {
     if (fd == f->fd) {
       file_close(f->file);
       list_remove(&f->file_elem);
+      free(f);
+      break;
     }
   }
   lock_release(&secure_file);
