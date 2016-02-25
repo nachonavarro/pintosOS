@@ -47,7 +47,10 @@ process_execute (const char *file_name_and_args)
   if (process == NULL) {
     return TID_ERROR;
   }
-
+//  if (filesys_open(process->filename) == NULL) {
+//    return TID_ERROR;
+//  }
+//  filesys_remove(process->filename);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
 
@@ -63,7 +66,6 @@ process_execute (const char *file_name_and_args)
 static struct process_info*
 parse_filename_and_args (const char* file_name_and_args)
 {
-
   /* Allocating memory for our process_info struct */
   void *new_page = palloc_get_page(0);
   struct process_info *p = new_page;
@@ -120,8 +122,9 @@ start_process (void *process)
 
   /* If load failed, quit. */
   palloc_free_page (process_to_start);
-  if (!success)
+  if (!success) {
     thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -136,17 +139,17 @@ start_process (void *process)
 /* Helper method which pushes a process' arguments onto the stack 
    given a process_info struct. */
 static void 
-push_arguments_on_stack(struct process_info *process_to_start, void **esp)
+push_arguments_on_stack(struct process_info *p, void **esp)
 {
 
-  int argc = process_to_start->argc;
-  char **argv = process_to_start->argv;
+//  int argc = process_to_start->argc;
+//  char *argv[] = process_to_start->argv;
 
   /* Pushing arguments to the stack in reverse order */
-  for (int j = process_to_start->argc; j > 0; j--) 
+  for (int j = p->argc; j > 0; j--)
   {
-    put_string_in_stack(esp, argv[j-1]);
-    argv[j-1] = *esp;
+    put_string_in_stack(esp, p->argv[j-1]);
+    p->argv[j-1] = *esp;
   }
 
   /* Rounding down the stack pointer to the nearest 
@@ -159,9 +162,9 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   put_uint_in_stack(esp, 0);
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = argc; k > 0; k--) 
+  for (int k = p->argc; k > 0; k--)
   {
-    put_uint_in_stack(esp, (uint32_t) argv[k-1]);
+    put_uint_in_stack(esp, (uint32_t) p->argv[k-1]);
   }
 
   /* Pushing pointer to the first pointer */
@@ -169,7 +172,7 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 
 
   /* Pushing number of arguments */
-  put_uint_in_stack(esp, argc);
+  put_uint_in_stack(esp, p->argc);
 
   /* Pushing fake return address */
   put_uint_in_stack(esp, 0);

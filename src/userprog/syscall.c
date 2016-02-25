@@ -79,7 +79,8 @@ syscall_handler (struct intr_frame *f)
     }
     case SYS_EXEC:
     {
-      pid_t pid = sys_exec("const char *cmd_line"); //TODO: Not sure where to get this from
+      const char *cmd_line  = (const char *)get_word_on_stack(f, 1);
+      pid_t pid = sys_exec(cmd_line);
       /* Returns new processes pid. */
       f->eax = pid;
       break;
@@ -87,7 +88,7 @@ syscall_handler (struct intr_frame *f)
     case SYS_WAIT:
     {
       pid_t pid = (pid_t)get_word_on_stack(f, 1);
-      /* Returns child's exit staus (pid argument is pid of this child). */
+      /* Returns child's exit status (pid argument is pid of this child). */
       f->eax = sys_wait(pid);
       break;
     }
@@ -201,10 +202,14 @@ sys_exit(int status) {
    process_execute(). */
 static pid_t
 sys_exec(const char *cmd_line) {
+  check_mem_ptr(cmd_line);
 //  lock_acquire(&secure_file);
   /* Identity mapping between thread id and process id, because
      Pintos is not multithreaded. */
   pid_t pid = (pid_t)process_execute(cmd_line);
+  struct thread *cur = thread_current();
+  sema_down(thread_current->exec_sema);
+  if (!)
 //  lock_release(&secure_file);
 
   return pid;

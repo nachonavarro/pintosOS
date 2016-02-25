@@ -136,6 +136,8 @@ struct thread
     struct semaphore exit_sema;    /* Semaphore to ensure the wait system
                                        call will wait until the thread has
                                        exited. Initialised to 0. */
+    struct semaphore exec_sema;
+    bool loaded;
 #endif
 
     int exit_status;
