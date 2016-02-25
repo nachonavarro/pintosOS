@@ -223,9 +223,10 @@ sys_wait(pid_t pid) {
    Returns true if successful. Creating a file does NOT open it. */
 static bool
 sys_create(const char *file, unsigned initial_size) {
-    if (file == NULL) {
-        sys_exit(-1);
-    }
+  check_mem_ptr(file);
+  if (file == NULL) {
+    sys_exit(-1);
+  }
 	lock_acquire(&secure_file);
 	bool success = filesys_create(file, initial_size);
 	lock_release(&secure_file);
@@ -412,9 +413,10 @@ static struct file* get_file(int fd) {
 static uint32_t 
 get_word_on_stack(struct intr_frame *f, int offset) 
 {
-  check_mem_ptr(f->esp);
-  check_mem_ptr(f->esp + offset*4);
-  return *((uint32_t *)(f->esp) + offset);
+  uint32_t *esp = f->esp;
+  check_mem_ptr(esp);
+  check_mem_ptr(esp + offset);
+  return *(esp + offset);
 }
 
 /* If supplied pointer is a null pointer, not in the user address space, or
