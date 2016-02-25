@@ -180,7 +180,7 @@ sys_exit(int status) {
 	struct thread *cur = thread_current();
 	cur->exit_status = status;
 	/* Process termination message, printing process' name and exit status. */
-	printf("%s: exit(%d) \n", cur->name, status);
+	printf("%s: exit(%d)\n", cur->name, status);
 	thread_exit();
 
 }
@@ -326,11 +326,11 @@ sys_write(int fd, const void *buffer, unsigned size) {
     bytes = file_write(f, buffer, size);
   }
 
-  struct file *f = get_file(fd);
-  if (!f) {
-    lock_release(&secure_file);
-    return -1;
-  }
+//  struct file *f = get_file(fd);
+//  if (!f) {
+//    lock_release(&secure_file);
+//    return -1;
+//  }
 
   lock_release(&secure_file);
   return bytes;
@@ -416,7 +416,7 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
 static void
 check_mem_ptr(const void *uaddr) {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
-      || pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
+      || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
     sys_exit(-1);
   }
 }

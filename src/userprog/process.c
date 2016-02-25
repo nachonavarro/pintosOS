@@ -42,18 +42,19 @@ process_execute (const char *file_name_and_args)
   struct process_info *process = parse_filename_and_args(file_name_and_args);
 
   /* In case of an error in the argument parsing */
-  if (process == NULL) 
+  if (process == NULL)
     return TID_ERROR;
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
 
   if (tid == TID_ERROR)
-    palloc_free_page (process); 
+    palloc_free_page (process);
   return tid;
+
 }
 
-/* Takes a string of argumy7fents and returns a struct process_info with the
+/* Takes a string of arguments and returns a struct process_info with the
    filename, argv and argc fields all set */
 static struct process_info*
 parse_filename_and_args (const char* file_name_and_args)
@@ -83,7 +84,6 @@ parse_filename_and_args (const char* file_name_and_args)
 
     if (token == NULL) 
       break;
-
     p->argv[p->argc] = token;
     p->argc++;
   }
@@ -100,7 +100,7 @@ static void
 start_process (void *process)
 {
 
-  struct process_info *process_to_start = process;
+  struct process_info *process_to_start = (struct process_info *)process;
   struct intr_frame if_;
   bool success;
 
@@ -116,7 +116,7 @@ start_process (void *process)
 
   /* If load failed, quit. */
   palloc_free_page (process_to_start);
-  if (!success) 
+  if (!success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
