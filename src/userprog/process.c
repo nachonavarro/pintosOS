@@ -74,6 +74,14 @@ parse_filename_and_args (const char* file_name_and_args)
      string for tokenising */
   int arg_length = strlen(file_name_and_args) + 1;
   void *starting_address = new_page + PGSIZE - arg_length;
+
+
+  /* Checking the arguments are small enough to fit into the page */
+  if ((uint32_t) arg_length > (PGSIZE - sizeof(struct process_info))) {
+    palloc_free_page(new_page);
+    return NULL;
+  }
+
   memcpy(starting_address, file_name_and_args, arg_length);
 
   /* Declaring helper pointers for strtok_r method */
@@ -90,8 +98,15 @@ parse_filename_and_args (const char* file_name_and_args)
 
     if (token == NULL) 
       break;
+
     p->argv[p->argc] = token;
     p->argc++;
+
+    if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t)
+        >= (uintptr_t) starting_address) {
+      palloc_free_page(new_page);
+      return NULL;
+    }
   }
 
   /* File name is the first token */
