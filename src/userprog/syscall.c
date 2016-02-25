@@ -219,7 +219,7 @@ sys_wait(pid_t pid) {
   return process_wait((tid_t) pid);
 }
 
-/* Creates file called 'file' that is initially 'initial_size_ bytes.
+/* Creates file called 'file' that is initially 'initial_size' bytes.
    Returns true if successful. Creating a file does NOT open it. */
 static bool
 sys_create(const char *file, unsigned initial_size) {

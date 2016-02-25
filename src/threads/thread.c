@@ -847,6 +847,8 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->exit_sema, 0);
   t->magic = THREAD_MAGIC;
 
+  list_init(&t->files);
+
   /* First file descriptor for a process' open file is 2, as 0 and 1 are
      reserved for input and output, respectively. */
   t->next_file_descriptor = 2;
