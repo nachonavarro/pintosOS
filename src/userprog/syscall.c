@@ -7,6 +7,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "threads/malloc.h"
@@ -222,6 +223,9 @@ sys_wait(pid_t pid) {
    Returns true if successful. Creating a file does NOT open it. */
 static bool
 sys_create(const char *file, unsigned initial_size) {
+    if (file == NULL) {
+        sys_exit(-1);
+    }
 	lock_acquire(&secure_file);
 	bool success = filesys_create(file, initial_size);
 	lock_release(&secure_file);
@@ -250,7 +254,7 @@ sys_open(const char *file) {
 	lock_acquire(&secure_file);
 	struct file *fl = filesys_open(file);
 	if (fl == NULL) {
-    lock_release(&secure_file);
+      lock_release(&secure_file);
 	  return -1;
 	}
 	struct thread *t = thread_current();
@@ -405,16 +409,19 @@ static struct file* get_file(int fd) {
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
    Only aligned word access is possible because the stack pointer is cast
    from a (void *) to a (uint32_t *). */
-static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
+static uint32_t 
+get_word_on_stack(struct intr_frame *f, int offset) 
+{
   check_mem_ptr(f->esp);
-  check_mem_ptr(f->esp + offset);
+  check_mem_ptr(f->esp + offset*4);
   return *((uint32_t *)(f->esp) + offset);
 }
 
 /* If supplied pointer is a null pointer, not in the user address space, or
    is an unmapped virtual address, the process is terminated. */
 static void
-check_mem_ptr(const void *uaddr) {
+check_mem_ptr(const void *uaddr) 
+{
   if (uaddr == NULL || !is_user_vaddr(uaddr)
       || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
     sys_exit(-1);

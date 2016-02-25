@@ -136,12 +136,6 @@ start_process (void *process)
 static void 
 push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 {
-  /* Rounding down the stack pointer to the nearest 
-     word multiple for faster access */
-  while (((uint32_t) *esp) % sizeof(uint32_t) != 0) {
-    (*esp)--;
-  } 
-
   /* Pushing arguments to the stack in reverse order */
   for (int j = process_to_start->argc; j > 0; j--) 
   {
