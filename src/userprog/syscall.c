@@ -416,7 +416,7 @@ static uint32_t get_word_on_stack(struct intr_frame *f, int offset) {
 static void
 check_mem_ptr(const void *uaddr) {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
-      || pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
+      || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
     sys_exit(-1);
   }
 }
