@@ -17,7 +17,7 @@ struct lock secure_file;
 
 static void syscall_handler (struct intr_frame *);
 static void sys_halt(void);
-static void sys_exit(int status);
+void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
@@ -178,7 +178,7 @@ sys_halt(void) {
    exit status). Status of 0 indicates success, and anything else indicates
    an error. After this function is called in syscall_handler(), the exit
    status is sent ('returned') to the kernel. */
-static void
+void
 sys_exit(int status) {
 
   struct thread *cur = thread_current();
@@ -317,8 +317,9 @@ sys_read(int fd, void *buffer, unsigned size) {
     struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
-      sys_exit(-1);
+      return -1;
     }
+    file_deny_write(f);
     bytes = file_read(f, buffer, size);
   }
   lock_release(&secure_file);
@@ -332,6 +333,12 @@ sys_read(int fd, void *buffer, unsigned size) {
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
   if (fd == 0) {
+    sys_exit(-1);
+  }
+  //printf("HELLOOOO\n");
+  //printf("%p", buffer);
+  if (buffer == NULL || !is_user_vaddr(buffer)
+      || pagedir_get_page(thread_current()->pagedir, buffer) == NULL) {
     sys_exit(-1);
   }
   check_fd(fd);
@@ -350,7 +357,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
     struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
-      sys_exit(-1);
+      return -1;
     }
     bytes = file_write(f, buffer, size);
   }
