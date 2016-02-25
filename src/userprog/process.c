@@ -136,11 +136,15 @@ start_process (void *process)
 static void 
 push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 {
+
+  int argc = process_to_start->argc;
+  char **argv = process_to_start->argv;
+
   /* Pushing arguments to the stack in reverse order */
   for (int j = process_to_start->argc; j > 0; j--) 
   {
-    put_string_in_stack(esp, process_to_start->argv[j-1]);
-    process_to_start->argv[j-1] = *esp;
+    put_string_in_stack(esp, argv[j-1]);
+    argv[j-1] = *esp;
   }
 
   /* Rounding down the stack pointer to the nearest 
@@ -153,9 +157,9 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
   put_uint_in_stack(esp, 0);
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = process_to_start->argc; k > 0; k--) 
+  for (int k = argc; k > 0; k--) 
   {
-    put_uint_in_stack(esp, (uint32_t) process_to_start->argv[k-1]);
+    put_uint_in_stack(esp, (uint32_t) argv[k-1]);
   }
 
   /* Pushing pointer to the first pointer */
@@ -163,7 +167,7 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 
 
   /* Pushing number of arguments */
-  put_uint_in_stack(esp, process_to_start->argc);
+  put_uint_in_stack(esp, argc);
 
   /* Pushing fake return address */
   put_uint_in_stack(esp, 0);
@@ -173,7 +177,7 @@ push_arguments_on_stack(struct process_info *process_to_start, void **esp)
 }
 
 /* Pushes a string onto the stack at the next location given by the stack ptr */
-void
+static void
 put_string_in_stack (void **esp, char *string)
 {
   int str_length = strlen(string) + 1;
@@ -182,7 +186,7 @@ put_string_in_stack (void **esp, char *string)
 }
 
 /* Pushes a uint32_t on the stack at the next location given by the stack ptr */
-void
+static void
 put_uint_in_stack (void **esp, uint32_t n) 
 {
   *esp -= sizeof(uint32_t);
