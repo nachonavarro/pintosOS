@@ -60,102 +60,102 @@ syscall_handler (struct intr_frame *f)
      check fails, the process is terminated. */
   //TODO: Do we need to check when writing? (Just when doing f->eax = ...??)
 
-	int syscall_number = (int)get_word_on_stack(f, 0);
+  int syscall_number = (int)get_word_on_stack(f, 0);
 
-	switch(syscall_number) {
-		case SYS_HALT:
-		{
-			sys_halt();
-			break;
-		}
-		case SYS_EXIT:
-		{
-			int status = (int)get_word_on_stack(f, 1);
-			sys_exit(status);
-			/* Returns exit status to the kernel. */
-			f->eax = status;
-			break;
-		}
-		case SYS_EXEC:
-		{
-			pid_t pid = sys_exec("const char *cmd_line"); //TODO: Not sure where to get this from
-			/* Returns new processes pid. */
-			f->eax = pid;
-			break;
-		}
-		case SYS_WAIT:
-		{
-		  pid_t pid = (pid_t)get_word_on_stack(f, 1);
-		  /* Returns child's exit staus (pid argument is pid of this child). */
-			f->eax = sys_wait(pid);
-			break;
-		}
-		case SYS_CREATE:
-		{
-			const char *filename  = (const char *)get_word_on_stack(f, 1);
-			unsigned initial_size = (unsigned)get_word_on_stack(f, 2);
-			/* Returns true to the kernel if creation is successful. */
-			f->eax = (int)sys_create(filename, initial_size);
-			break;
-		}
-		case SYS_REMOVE:
-		{
-			const char *filename = (const char *)get_word_on_stack(f, 1);
-			f->eax = sys_remove(filename);
-			break;
-		}
-		case SYS_OPEN:
-		{
-			const char *filename = (const char *)get_word_on_stack(f, 1);
-			f->eax = sys_open(filename);
-			break;
-		}
-		case SYS_FILESIZE:
-		{
-			int fd = (int)get_word_on_stack(f, 1);
-			f->eax = sys_filesize(fd);
-			break;
-		}
-		case SYS_READ:
-		{
-			int fd        = (int)get_word_on_stack(f, 1);
-			void *buffer  = (void *)get_word_on_stack(f, 2);
-			unsigned size = (unsigned)get_word_on_stack(f, 3);
-			f->eax = sys_read(fd, buffer, size);
-			break;
-		}
-		case SYS_WRITE:
-		{
-			int fd        = (int)get_word_on_stack(f, 1);
-			void *buffer  = (void *)get_word_on_stack(f, 2);
-			unsigned size = (unsigned)get_word_on_stack(f, 3);
-			f->eax = sys_write(fd, buffer, size);
-			break;
-		}
-		case SYS_SEEK:
-		{
-			int fd             = (int)get_word_on_stack(f, 1);
-			unsigned position  = (int)get_word_on_stack(f, 2);
-			sys_seek(fd, position);
-			break;
-		}
-		case SYS_TELL:
-		{
-			int fd        = (int)get_word_on_stack(f, 1);
-			f->eax = sys_tell(fd);
-			break;
-		}
-		case SYS_CLOSE:
-		{
-		  int fd        = (int)get_word_on_stack(f, 1);
-			sys_close(fd);
-			break;
-		}
-		default:
-		{
-		  NOT_REACHED();
-		}
-	}
+  switch(syscall_number) {
+    case SYS_HALT:
+    {
+      sys_halt();
+      break;
+    }
+    case SYS_EXIT:
+    {
+      int status = (int)get_word_on_stack(f, 1);
+      sys_exit(status);
+      /* Returns exit status to the kernel. */
+      f->eax = status;
+      break;
+    }
+    case SYS_EXEC:
+    {
+      pid_t pid = sys_exec("const char *cmd_line"); //TODO: Not sure where to get this from
+      /* Returns new processes pid. */
+      f->eax = pid;
+      break;
+    }
+    case SYS_WAIT:
+    {
+      pid_t pid = (pid_t)get_word_on_stack(f, 1);
+      /* Returns child's exit staus (pid argument is pid of this child). */
+      f->eax = sys_wait(pid);
+      break;
+    }
+    case SYS_CREATE:
+    {
+      const char *filename  = (const char *)get_word_on_stack(f, 1);
+      unsigned initial_size = (unsigned)get_word_on_stack(f, 2);
+      /* Returns true to the kernel if creation is successful. */
+      f->eax = (int)sys_create(filename, initial_size);
+      break;
+    }
+    case SYS_REMOVE:
+    {
+      const char *filename = (const char *)get_word_on_stack(f, 1);
+      f->eax = sys_remove(filename);
+      break;
+    }
+    case SYS_OPEN:
+    {
+      const char *filename = (const char *)get_word_on_stack(f, 1);
+      f->eax = sys_open(filename);
+      break;
+    }
+    case SYS_FILESIZE:
+    {
+      int fd = (int)get_word_on_stack(f, 1);
+      f->eax = sys_filesize(fd);
+      break;
+    }
+    case SYS_READ:
+    {
+      int fd        = (int)get_word_on_stack(f, 1);
+      void *buffer  = (void *)get_word_on_stack(f, 2);
+      unsigned size = (unsigned)get_word_on_stack(f, 3);
+      f->eax = sys_read(fd, buffer, size);
+      break;
+    }
+    case SYS_WRITE:
+    {
+      int fd        = (int)get_word_on_stack(f, 1);
+      void *buffer  = (void *)get_word_on_stack(f, 2);
+      unsigned size = (unsigned)get_word_on_stack(f, 3);
+      f->eax = sys_write(fd, buffer, size);
+      break;
+    }
+    case SYS_SEEK:
+    {
+      int fd             = (int)get_word_on_stack(f, 1);
+      unsigned position  = (int)get_word_on_stack(f, 2);
+      sys_seek(fd, position);
+      break;
+    }
+    case SYS_TELL:
+    {
+      int fd        = (int)get_word_on_stack(f, 1);
+      f->eax = sys_tell(fd);
+      break;
+    }
+    case SYS_CLOSE:
+    {
+      int fd        = (int)get_word_on_stack(f, 1);
+      sys_close(fd);
+      break;
+    }
+    default:
+    {
+      NOT_REACHED();
+    }
+  }
 
 }
 
@@ -167,7 +167,7 @@ syscall_handler (struct intr_frame *f)
    (such as information about possible deadlocks). */
 static void
 sys_halt(void) {
-	shutdown_power_off();
+  shutdown_power_off();
 }
 
 /* Terminates the current user program. If the processes parent waits for it,
@@ -178,11 +178,11 @@ sys_halt(void) {
 static void
 sys_exit(int status) {
 
-	struct thread *cur = thread_current();
-	cur->exit_status = status;
-	/* Process termination message, printing process' name and exit status. */
-	printf("%s: exit(%d)\n", cur->name, status);
-	thread_exit();
+  struct thread *cur = thread_current();
+  cur->exit_status = status;
+  /* Process termination message, printing process' name and exit status. */
+  printf("%s: exit(%d)\n", cur->name, status);
+  thread_exit();
 
 }
 
@@ -219,7 +219,7 @@ sys_wait(pid_t pid) {
   return process_wait((tid_t) pid);
 }
 
-/* Creates file called 'file' that is initially 'initial_size_ bytes.
+/* Creates file called 'file' that is initially 'initial_size' bytes.
    Returns true if successful. Creating a file does NOT open it. */
 static bool
 sys_create(const char *file, unsigned initial_size) {
@@ -227,10 +227,10 @@ sys_create(const char *file, unsigned initial_size) {
   if (file == NULL) {
     sys_exit(-1);
   }
-	lock_acquire(&secure_file);
-	bool success = filesys_create(file, initial_size);
-	lock_release(&secure_file);
-	return success;
+  lock_acquire(&secure_file);
+  bool success = filesys_create(file, initial_size);
+  lock_release(&secure_file);
+  return success;
 }
 
 /* Removes file called 'file'. Returns true if successful, and false otherwise
@@ -238,10 +238,10 @@ sys_create(const char *file, unsigned initial_size) {
    but it is not closed. */
 static bool
 sys_remove(const char *file) {
-	lock_acquire(&secure_file);
-	bool success = filesys_remove(file);
-	lock_release(&secure_file);
-	return success;
+  lock_acquire(&secure_file);
+  bool success = filesys_remove(file);
+  lock_release(&secure_file);
+  return success;
 
 }
 
@@ -252,34 +252,34 @@ sys_remove(const char *file) {
    If file could not be opened, -1 is returned. */
 static int
 sys_open(const char *file) {
-	lock_acquire(&secure_file);
-	struct file *fl = filesys_open(file);
-	if (fl == NULL) {
+  lock_acquire(&secure_file);
+  struct file *fl = filesys_open(file);
+  if (fl == NULL) {
       lock_release(&secure_file);
-	  return -1;
-	}
-	struct thread *t = thread_current();
-	struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
-	list_push_front(&t->files, &f->file_elem);
-	f->file = fl;
-	int file_descriptor =t->next_file_descriptor;
-	f->fd = file_descriptor;
-	/* Increment next_file_descirptor so that the next file to be
-	   opened has a different file descriptor. */
-	t->next_file_descriptor++;
-	lock_release(&secure_file);
+    return -1;
+  }
+  struct thread *t = thread_current();
+  struct proc_file *f = malloc(sizeof(struct proc_file)); // TODO: REMEMBER WE NEED TO FREE SOMEWHERE.
+  list_push_front(&t->files, &f->file_elem);
+  f->file = fl;
+  int file_descriptor =t->next_file_descriptor;
+  f->fd = file_descriptor;
+  /* Increment next_file_descirptor so that the next file to be
+     opened has a different file descriptor. */
+  t->next_file_descriptor++;
+  lock_release(&secure_file);
 
-	return file_descriptor;
+  return file_descriptor;
 }
 
 /* Returns size, in bytes, of file open as 'fd'. */
 static int
 sys_filesize(int fd) {
-	lock_acquire(&secure_file);
-	struct file *f = get_file(fd);
-	int length = file_length(f);
-	lock_release(&secure_file);
-	return length;
+  lock_acquire(&secure_file);
+  struct file *f = get_file(fd);
+  int length = file_length(f);
+  lock_release(&secure_file);
+  return length;
 }
 
 /* Reads 'size' bytes from file open as fd into buffer. Returns number of
@@ -289,25 +289,28 @@ static int
 sys_read(int fd, void *buffer, unsigned size) {
   //TODO: Do we need to check fd is valid?
   int bytes;
-	lock_acquire(&secure_file);
-	if (fd == 0) {
-	  unsigned i;
-	  uint8_t keys[size];
-	  for (i = 0; i < size; i++) {
-	    keys[size] = input_getc();
-	  }
-	  memcpy(buffer, (const void *) keys, size);
-	  bytes = size;
-	} else {
-	  struct file *f = get_file(fd);
-	  if (!f) {
-	    lock_release(&secure_file);
-	    return -1;
-	  }
-	  bytes = file_read(f, buffer, size);
-	}
-	lock_release(&secure_file);
-	return bytes;
+  lock_acquire(&secure_file);
+  if (fd == 0) {
+    unsigned i;
+    uint8_t keys[size];
+    for (i = 0; i < size; i++) {
+      keys[size] = input_getc();
+    }
+    memcpy(buffer, (const void *) keys, size);
+    bytes = size;
+  } else if (fd == 1) { // Trying to read from stdout
+    lock_release(&secure_file);
+    return -1;
+  } else {
+    struct file *f = get_file(fd);
+    if (!f) {
+      lock_release(&secure_file);
+      return -1;
+    }
+    bytes = file_read(f, buffer, size);
+  }
+  lock_release(&secure_file);
+  return bytes;
 }
 
 /* Writes size bytes from buffer to the OPEN file fd. Returns the number
@@ -346,30 +349,30 @@ sys_write(int fd, const void *buffer, unsigned size) {
    'position' (in bytes, from start of file). */
 static void
 sys_seek(int fd, unsigned position) {
-	lock_acquire(&secure_file);
-	struct file *f = get_file(fd);
-	if (!f) {
+  lock_acquire(&secure_file);
+  struct file *f = get_file(fd);
+  if (!f) {
     lock_release(&secure_file);
     return;
   }
-	file_seek(f, position);
-	lock_release(&secure_file);
+  file_seek(f, position);
+  lock_release(&secure_file);
 }
 
 /* Returns the position of the next byte to be read or written in open
    file 'fd' (in bytes, from start of file). */
 static unsigned
 sys_tell(int fd) {
-	lock_acquire(&secure_file);
-	struct file *f = get_file(fd);
-	if (!f) {
+  lock_acquire(&secure_file);
+  struct file *f = get_file(fd);
+  if (!f) {
     lock_release(&secure_file);
     NOT_REACHED();
 //    return -1;
   }
-	int position = file_tell(f);
-	lock_release(&secure_file);
-	return position;
+  int position = file_tell(f);
+  lock_release(&secure_file);
+  return position;
 }
 
 //TODO: Do we need to actually close all open file descriptors?
@@ -377,34 +380,34 @@ sys_tell(int fd) {
 /* Closes file descriptor fd. */
 static void
 sys_close(int fd) {
-	lock_acquire(&secure_file);
-	struct thread *cur = thread_current();
-	struct list_elem *e;
-	for (e = list_begin (&cur->files); e != list_end (&cur->files);
-	     e = list_next (e)) {
-		struct proc_file *f = list_entry(e, struct proc_file, file_elem);
-		if (fd == f->fd) {
-			file_close(f->file);
-			list_remove(&f->file_elem);
-		}
-	}
-	lock_release(&secure_file);
+  lock_acquire(&secure_file);
+  struct thread *cur = thread_current();
+  struct list_elem *e;
+  for (e = list_begin (&cur->files); e != list_end (&cur->files);
+       e = list_next (e)) {
+    struct proc_file *f = list_entry(e, struct proc_file, file_elem);
+    if (fd == f->fd) {
+      file_close(f->file);
+      list_remove(&f->file_elem);
+    }
+  }
+  lock_release(&secure_file);
 }
 
 /* Returns the file corresponding the to supplied file descriptor
    in the current thread's list of files that it can see. */
 static struct file* get_file(int fd) {
-	struct thread *cur = thread_current();
-	struct list_elem *e;
-	for (e = list_begin (&cur->files); e != list_end (&cur->files);
-	     e = list_next (e)) {
-		struct proc_file *f = list_entry(e, struct proc_file, file_elem);
-		if (fd == f->fd) {
-			return f->file;
-		}
-	}
-	NOT_REACHED();
-	return NULL;
+  struct thread *cur = thread_current();
+  struct list_elem *e;
+  for (e = list_begin (&cur->files); e != list_end (&cur->files);
+       e = list_next (e)) {
+    struct proc_file *f = list_entry(e, struct proc_file, file_elem);
+    if (fd == f->fd) {
+      return f->file;
+    }
+  }
+  NOT_REACHED();
+  return NULL;
 }
 
 /* Returns the word (4 bytes) at a given offset from a frames stack pointer.
