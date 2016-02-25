@@ -136,7 +136,7 @@ struct thread
     struct semaphore exit_sema;    /* Semaphore to ensure the wait system
                                        call will wait until the thread has
                                        exited. Initialised to 0. */
-    struct semaphore exec_sema;
+    struct semaphore load_sema;
     bool loaded;
 #endif
 
@@ -178,6 +178,8 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+struct thread *tid_to_thread(tid_t tid);
 
 /* PART 1: Priority scheduling */
 void thread_donate_priority (struct thread *t, int priority);
