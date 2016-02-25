@@ -116,12 +116,18 @@ start_process (void *process)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (process_to_start->filename, &if_.eip, &if_.esp);
+  struct thread *cur = thread_current();
+  cur->loaded = success;
+  sema_up(&cur->load_sema);
 
   // Push the process arguments on to the stack using a helper method */
-  push_arguments_on_stack(process_to_start, &if_.esp);
+  if (success) {
+    push_arguments_on_stack(process_to_start, &if_.esp);
+  }
 
   /* If load failed, quit. */
   palloc_free_page (process_to_start);
+
   if (!success) {
     thread_exit ();
   }

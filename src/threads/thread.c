@@ -845,6 +845,7 @@ init_thread (struct thread *t, const char *name, int priority)
      called in thread_exit(). This means the wait system call cannot
      return the exit status until thread has terminated. */
   sema_init(&t->exit_sema, 0);
+  sema_init(&t->load_sema, 0);
   t->magic = THREAD_MAGIC;
 
   list_init(&t->files);
@@ -1005,4 +1006,22 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 bool
 is_idle_thread(struct thread *t){
   return t==idle_thread;
+}
+
+struct thread *
+tid_to_thread(tid_t tid) {
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&all_list);
+       e != list_end (&all_list);
+       e = list_next (e)) {
+    struct thread *t = list_entry (e, struct thread, allelem);
+    if (t->tid == tid) {
+      return t;
+    }
+  }
+  NOT_REACHED();
+  return NULL;
 }

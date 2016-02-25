@@ -207,10 +207,21 @@ sys_exec(const char *cmd_line) {
   /* Identity mapping between thread id and process id, because
      Pintos is not multithreaded. */
   pid_t pid = (pid_t)process_execute(cmd_line);
-  struct thread *cur = thread_current();
-  sema_down(thread_current->exec_sema);
-  if (!)
-//  lock_release(&secure_file);
+  /* We want to wait until the child has definitely loaded, and then check to
+     see whether it has loaded or not (e.g. whether the filename was invalid).
+     exec_sema is initialised to 0 for a thread. We use exec_sema of the child
+     to make this function wait, by doing sema_down on the child's exec_sema. We
+     will have to wait until sema_up has been called on this sema in
+     start_process (after load has been called). Just before sema_up has been
+     called, start_process will set the threads loaded bool to true, so we can
+     then read this bool to decide whether to return -1.  */
+  enum intr_level old_level = intr_disable();
+  struct thread *child = tid_to_thread((tid_t)pid);
+  intr_set_level(old_level);
+  sema_down(&child->load_sema);
+  if (!(child->loaded)) {
+    return -1;
+  }
 
   return pid;
 }
@@ -264,7 +275,7 @@ sys_open(const char *file) {
   lock_acquire(&secure_file);
   struct file *fl = filesys_open(file);
   if (fl == NULL) {
-      lock_release(&secure_file);
+    lock_release(&secure_file);
     return -1;
   }
   struct thread *t = thread_current();
