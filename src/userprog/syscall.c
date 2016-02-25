@@ -35,6 +35,7 @@ static struct file* get_file(int fd);
 static void check_mem_ptr(const void *uaddr);
 static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
+static void check_buffer(void *buffer, unsigned size);
 
 /* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
    has a list of proc_files to represent the file descriptors it has open. Two
@@ -312,7 +313,7 @@ sys_read(int fd, void *buffer, unsigned size) {
     sys_exit(-1);
   }
   check_fd(fd);
-  check_mem_ptr(buffer);
+  check_buffer(buffer, size);
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 0) {
@@ -345,7 +346,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
     sys_exit(-1);
   }
   check_fd(fd);
-  check_mem_ptr(buffer);
+  check_buffer(buffer, size);
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 1) {
@@ -358,14 +359,12 @@ sys_write(int fd, const void *buffer, unsigned size) {
     bytes = size;
   } else {
     struct file *f = get_file(fd);
+    if (!f) {
+      lock_release(&secure_file);
+      return -1;
+    }
     bytes = file_write(f, buffer, size);
   }
-
-//  struct file *f = get_file(fd);
-//  if (!f) {
-//    lock_release(&secure_file);
-//    return -1;
-//  }
 
   lock_release(&secure_file);
   return bytes;
@@ -462,6 +461,17 @@ check_mem_ptr(const void *uaddr)
       || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
     sys_exit(-1);
   }
+}
+
+static void
+check_buffer(void *buffer, unsigned size)
+{
+	char *buf = (char *) buffer;
+	unsigned i;
+	for (i = 0; i < size; i++) {
+		check_mem_ptr(buf);
+		buf++;
+	}
 }
 
 static void
