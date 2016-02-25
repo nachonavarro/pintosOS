@@ -22,8 +22,10 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
-static struct process_info* parse_filename_and_args(const char* file_name_and_args);
-static void push_arguments_on_stack(struct process_info *process_to_start, void **esp);
+static struct process_info* parse_filename_and_args(
+                              const char* file_name_and_args);
+static void push_arguments_on_stack(struct process_info *process_to_start, 
+                                    void **esp);
 static void put_string_in_stack(void **esp, char *string);
 static void put_uint_in_stack(void **esp, uint32_t n);
 
