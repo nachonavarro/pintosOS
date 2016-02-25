@@ -376,8 +376,7 @@ sys_tell(int fd) {
   struct file *f = get_file(fd);
   if (!f) {
     lock_release(&secure_file);
-    NOT_REACHED();
-//    return -1;
+    sys_exit(-1);
   }
   int position = file_tell(f);
   lock_release(&secure_file);
@@ -399,6 +398,8 @@ sys_close(int fd) {
     if (fd == f->fd) {
       file_close(f->file);
       list_remove(&f->file_elem);
+      free(f);
+      break;
     }
   }
   lock_release(&secure_file);
