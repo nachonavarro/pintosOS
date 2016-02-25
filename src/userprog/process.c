@@ -44,14 +44,16 @@ process_execute (const char *file_name_and_args)
   struct process_info *process = parse_filename_and_args(file_name_and_args);
 
   /* In case of an error in the argument parsing */
-  if (process == NULL)
+  if (process == NULL) {
     return TID_ERROR;
+  }
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
 
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page (process);
+  }
   return tid;
 
 }

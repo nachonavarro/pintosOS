@@ -292,6 +292,9 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
+  if (fd == 1) {
+    sys_exit(-1);
+  }
   check_fd(fd);
   check_mem_ptr(buffer);
   int bytes;
@@ -304,9 +307,6 @@ sys_read(int fd, void *buffer, unsigned size) {
     }
     memcpy(buffer, (const void *) keys, size);
     bytes = size;
-  } else if (fd == 1) { // Trying to read from stdout
-    lock_release(&secure_file);
-    return -1;
   } else {
     struct file *f = get_file(fd);
     if (!f) {
@@ -325,7 +325,11 @@ sys_read(int fd, void *buffer, unsigned size) {
    bytes already written. fd = 1 writes to the console. */
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
+  if (fd == 0) {
+    sys_exit(-1);
+  }
   check_fd(fd);
+  check_mem_ptr(buffer);
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 1) {
