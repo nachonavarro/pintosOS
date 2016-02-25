@@ -252,6 +252,10 @@ sys_remove(const char *file) {
    If file could not be opened, -1 is returned. */
 static int
 sys_open(const char *file) {
+  check_mem_ptr(file);
+  if (file == NULL) {
+    sys_exit(-1);
+  }
   lock_acquire(&secure_file);
   struct file *fl = filesys_open(file);
   if (fl == NULL) {
@@ -287,7 +291,8 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
-  //TODO: Do we need to check fd is valid?
+  struct file *f = get_file(fd);
+  check_mem_ptr(get_file(fd));
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 0) {
@@ -302,7 +307,6 @@ sys_read(int fd, void *buffer, unsigned size) {
     lock_release(&secure_file);
     return -1;
   } else {
-    struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
       return -1;
