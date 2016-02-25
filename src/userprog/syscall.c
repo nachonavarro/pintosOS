@@ -33,6 +33,7 @@ static void sys_close(int fd);
 /* Helper functions for system calls. */
 static struct file* get_file(int fd);
 static void check_mem_ptr(const void *uaddr);
+static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 
 /* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
@@ -278,6 +279,7 @@ sys_open(const char *file) {
 /* Returns size, in bytes, of file open as 'fd'. */
 static int
 sys_filesize(int fd) {
+  check_fd(fd);
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   int length = file_length(f);
@@ -290,6 +292,7 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
+  check_fd(fd);
   check_mem_ptr(buffer);
   int bytes;
   lock_acquire(&secure_file);
@@ -322,6 +325,7 @@ sys_read(int fd, void *buffer, unsigned size) {
    bytes already written. fd = 1 writes to the console. */
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
+  check_fd(fd);
   int bytes;
   lock_acquire(&secure_file);
   if (fd == 1) {
@@ -352,6 +356,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
    'position' (in bytes, from start of file). */
 static void
 sys_seek(int fd, unsigned position) {
+  check_fd(fd);
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   if (!f) {
@@ -366,6 +371,7 @@ sys_seek(int fd, unsigned position) {
    file 'fd' (in bytes, from start of file). */
 static unsigned
 sys_tell(int fd) {
+  check_fd(fd);
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   if (!f) {
@@ -383,6 +389,7 @@ sys_tell(int fd) {
 /* Closes file descriptor fd. */
 static void
 sys_close(int fd) {
+  check_fd(fd);
   lock_acquire(&secure_file);
   struct thread *cur = thread_current();
   struct list_elem *e;
@@ -432,6 +439,15 @@ check_mem_ptr(const void *uaddr)
 {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
       || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
+    sys_exit(-1);
+  }
+}
+
+static void
+check_fd(int fd) {
+  struct thread *cur = thread_current();
+  int next_fd = cur->next_file_descriptor;
+  if (fd < 0 || fd > next_fd) {
     sys_exit(-1);
   }
 }
