@@ -469,7 +469,6 @@ static uint32_t
 get_word_on_stack(struct intr_frame *f, int offset) 
 {
   uint32_t *esp = f->esp;
-  check_mem_ptr(esp);
   check_mem_ptr(esp + offset);
   return *(esp + offset);
 }
