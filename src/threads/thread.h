@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <threads/synch.h>
 #include "fixed-point.h"
+#include "userprog/process.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -147,6 +148,11 @@ struct thread
                                       be returned from sys_exec(). loaded is
                                       set to false when the thread is
                                       created. */
+    char executable[MAX_FILENAME_LENGTH]; /* In start_process(), if we load an
+                                             executable on a thread, the
+                                             thread's executable member will be
+                                             set to the filename of this
+                                             executable. */
 #endif
 
     int exit_status;

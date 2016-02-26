@@ -36,6 +36,7 @@ static void check_mem_ptr(const void *uaddr);
 static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 static void check_buffer(void *buffer, unsigned size);
+static bool is_executable(const char *file);
 
 void
 syscall_init (void) 
@@ -276,7 +277,11 @@ sys_open(const char *file) {
   }
   list_push_front(&t->files, &f->file_elem);
   f->file = fl;
-
+  /* If file is currently being run as an executable in this process, we must
+     not be able to write to it. */
+  if (is_executable(file)) {
+    file_deny_write(f->file);
+  }
   int file_descriptor = t->next_file_descriptor;
   f->fd = file_descriptor;
   /* Increment next_file_descirptor so that the next file to be
@@ -505,4 +510,11 @@ check_fd(int fd) {
   if (fd < 0 || fd > next_fd) {
     sys_exit(-1);
   }
+}
+
+/* Returns true if the supplied filename is the executable running in the
+   current thread/process. */
+static bool
+is_executable(const char *file) {
+  return (strcmp(file, thread_current()->executable) == 0);
 }

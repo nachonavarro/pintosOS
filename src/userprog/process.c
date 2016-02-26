@@ -133,13 +133,20 @@ start_process (void *process)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (process_to_start->filename, &if_.eip, &if_.esp);
 
+  struct thread *cur = thread_current();
+
+  /* Set thread's executable file to the file that was loaded, if it was
+     indeed an executable file. */
+  if (success) {
+    strlcpy(cur->executable, process_to_start->filename,
+                      strlen(process_to_start->filename) + 1);
+  }
+
   /* Set the current thread's 'loaded' member to the return value from load,
      and then call sema_up on the thread's load_sema, so that sys_exec knows
      to now check whether the process has loaded successfully or not. */
-  struct thread *cur = thread_current();
   cur->loaded = success;
   sema_up(&cur->load_sema);
-
 
   /* Push the process arguments on to the stack using a helper method, if
      the process successfully loaded. */
@@ -424,8 +431,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  // ADDED
-  file_deny_write(file);
+//  // ADDED
+//  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
