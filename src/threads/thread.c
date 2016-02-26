@@ -380,7 +380,9 @@ thread_exit (void)
 
   list_remove (&thread_current()->allelem);
   struct thread *cur = thread_current();
+#ifdef USERPROG
   sema_up(&cur->exit_sema);
+#endif
   cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();

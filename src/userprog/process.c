@@ -18,6 +18,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -282,6 +283,13 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  while(!list_empty(&cur->files)) {
+    struct list_elem* e = list_begin(&cur->files);
+    struct proc_file* f = list_entry(e, struct proc_file, file_elem);
+    file_close(f->file);
+    list_remove(&f->file_elem);
+    free(f);
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
