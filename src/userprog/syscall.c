@@ -284,6 +284,7 @@ sys_open(const char *file) {
   struct thread *t = thread_current();
   /* Freed in sys_close(). */
   struct proc_file *f = malloc(sizeof(struct proc_file));
+ // file_deny_write(f->file);
   list_push_front(&t->files, &f->file_elem);
   f->file = fl;
 
@@ -343,7 +344,7 @@ sys_read(int fd, void *buffer, unsigned size) {
       lock_release(&secure_file);
       return -1;
     }
-    file_deny_write(f);
+   // file_deny_write(f);
     bytes = file_read(f, buffer, size);
   }
   lock_release(&secure_file);
@@ -450,6 +451,7 @@ sys_close(int fd) {
        e = list_next (e)) {
     struct proc_file *f = list_entry(e, struct proc_file, file_elem);
     if (fd == f->fd) {
+      file_allow_write(f->file);
       file_close(f->file);
       list_remove(&f->file_elem);
       free(f);
@@ -482,7 +484,6 @@ static uint32_t
 get_word_on_stack(struct intr_frame *f, int offset) 
 {
   uint32_t *esp = f->esp;
-  check_mem_ptr(esp);
   check_mem_ptr(esp + offset);
   return *(esp + offset);
 }
