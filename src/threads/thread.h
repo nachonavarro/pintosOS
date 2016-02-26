@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <threads/synch.h>
 #include "fixed-point.h"
-#include "userprog/process.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -39,6 +38,8 @@ typedef int tid_t;
 #define LOAD_AVG_COEFFICIENT DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(59), 60)
 #define READY_THREAD_COUNT_COEFFICIENT       \
                               DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60)
+
+#define MAX_FILENAME_LENGTH 14
 
 /* A kernel thread or user process.
 
