@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -110,8 +111,9 @@ parse_filename_and_args (const char* file_name_and_args)
     }
   }
 
-  /* File name is the first token */
+  /* File name is the first token in argv */
   p->filename = p->argv[0];
+  ASSERT(strlen(p->filename) <= MAX_FILENAME_LENGTH);
 
   return p;
 }
