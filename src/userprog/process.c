@@ -283,6 +283,8 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  /* Close all files that this thread had open. */
   while(!list_empty(&cur->files)) {
     struct list_elem* e = list_begin(&cur->files);
     struct proc_file* f = list_entry(e, struct proc_file, file_elem);
