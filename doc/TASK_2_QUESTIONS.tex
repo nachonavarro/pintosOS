@@ -11,6 +11,7 @@
 \usepackage{multirow}
 \usepackage{subcaption}
 \renewcommand{\_}{\char`_}
+\renewcommand{\tt}{\lstinline}
 
 % Margins
 \topmargin=-0.45in
@@ -25,6 +26,7 @@
 \lstset{language=C,
                 basicstyle=\ttfamily,
                 keywordstyle=\color{blue}\ttfamily,
+                morekeywords={bool},
                 stringstyle=\color{red}\ttfamily,
                 commentstyle=\color{Plum}\ttfamily,
                 morecomment=[l][\color{magenta}]{\#}
@@ -67,6 +69,76 @@
 
 \section{Design Questions: Argument Passing}
 \section{Design Questions: System Calls}
+\subsection{Data Structures}
+\subsubsection{Purpose of new variables and \texttt{struct} members}
+\begin{enumerate}
+
+\item \begin{lstlisting}
+struct thread
+  {
+		.
+		.
+		
+#ifdef USERPROG
+    uint32_t *pagedir;              /* Page directory. */
+    struct list children;
+    struct list_elem child_elem;  
+    bool waited_on;        
+    struct semaphore exit_sema;  
+    struct semaphore load_sema;  
+    bool loaded;
+    char executable[MAX_FILENAME_LENGTH]; 
+    int exit_status;
+    struct list files;        
+    int next_file_descriptor;  
+#endif
+		.
+		.
+  };
+\end{lstlisting}
+
+\item \begin{lstlisting}
+/* Owned by userprog/syscall.h. */
+struct proc_file {
+  struct file *file;
+  int fd;
+  struct list_elem file_elem;
+};
+\end{lstlisting}
+
+\item \begin{lstlisting}
+/* Owned by userprog/syscall.c. */
+struct lock secure_file;
+\end{lstlisting}
+
+\end{enumerate}
+
+\begin{enumerate}
+\item In the \texttt{struct thread} we have added:
+\begin{itemize}
+\item \lstinline{struct list children}: List of child threads this thread has. 
+\item \lstinline{struct list_elem child_elem}: A struct \lstinline{list_elem} to be put in the list of another thread's children. 
+\item \lstinline{bool waited_on}: Boolean set to true if the thread's parent has waited on this thread. Note we never set to false after 
+being set to true, because we do not want to be able to wait on the same thread twice.
+\item \lstinline{struct semaphore exit_sema}: Semaphore initialised to 0 to ensure the wait system call will wait until the thread has exited.
+\item \lstinline{struct semaphore load_sema}: Semaphore to ensure the exec system call does not check to see if the child has successfully loaded until it has tried to be loaded.
+\item \lstinline{bool loaded}: Set to the return value of \lstinline{load()} in \lstinline{start_process()}, so that \lstinline{sys_exec()} can check whether the child loaded successfully or not, as if not, -1 should be returned from \lstinline{sys_exec()}. \lstinline{loaded} is set to false when the thread is created. 
+\item \lstinline{char executable[MAX_FILENAME_LENGTH]}: In \tt{start_process()}, if we load an executable on a thread,  \lstinline{executable} will be set to the filename of the executable. This will be useful in denying and allowing writes. 
+\item \lstinline{int exit_status}: Status when the system exits.
+\item \lstinline{struct list files}: List of files that a thread has open (Same file can be open with different fd).
+\item \lstinline{int next_file_descriptor}: Next file to be opened by this process/thread will take this as its file descriptor. Incremented after a file is opened.
+\end{itemize}
+\item Each thread (i.e. process, as Pintos is not multithreaded) has a list of \texttt{proc\_files} to represent the file descriptors it has open. Two different \texttt{proc\_files} (even open in the same process) can have the same file member, but a different fd, due to it being opened twice. 
+\item A lock used to ensure synchronization when accessing or modifying files.
+
+\end{enumerate}
+
+
+\subsubsection{File descriptors}
+Each open file in a process has a file descriptor that represents the file. In other words, file descriptors index the open files in a process. In our implementation, we have a \texttt{proc\_file} that has a file descriptor and the associated file. When we are given a file descriptor to access a file, we iterate over the list of \texttt{proc\_file} a thread owns stopping when the file descriptors match.
+File descriptors are unique within a single process, but not within the entire OS since they only index open files within a process, i.e, two different processes may have same file descriptors but they work independently.
+
+
 
 
 
