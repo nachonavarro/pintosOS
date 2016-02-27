@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -18,6 +19,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -109,8 +111,9 @@ parse_filename_and_args (const char* file_name_and_args)
     }
   }
 
-  /* File name is the first token */
+  /* File name is the first token in argv */
   p->filename = p->argv[0];
+  ASSERT(strlen(p->filename) <= MAX_FILENAME_LENGTH);
 
   return p;
 }
@@ -132,10 +135,18 @@ start_process (void *process)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (process_to_start->filename, &if_.eip, &if_.esp);
 
+  struct thread *cur = thread_current();
+
+  /* Set thread's executable file to the file that was loaded, if it was
+     indeed an executable file. */
+  if (success) {
+    strlcpy(cur->executable, process_to_start->filename,
+                      strlen(process_to_start->filename) + 1);
+  }
+
   /* Set the current thread's 'loaded' member to the return value from load,
      and then call sema_up on the thread's load_sema, so that sys_exec knows
      to now check whether the process has loaded successfully or not. */
-  struct thread *cur = thread_current();
   cur->loaded = success;
   sema_up(&cur->load_sema);
 
@@ -283,6 +294,15 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* Close all files that this thread had open. */
+  while(!list_empty(&cur->files)) {
+    struct list_elem* e = list_begin(&cur->files);
+    struct proc_file* f = list_entry(e, struct proc_file, file_elem);
+    file_close(f->file);
+    list_remove(&f->file_elem);
+    free(f);
+  }
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -413,6 +433,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+//  // ADDED
+//  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

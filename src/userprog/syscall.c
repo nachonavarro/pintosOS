@@ -4,7 +4,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
@@ -37,16 +36,7 @@ static void check_mem_ptr(const void *uaddr);
 static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 static void check_buffer(void *buffer, unsigned size);
-
-/* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
-   has a list of proc_files to represent the file descriptors it has open. Two
-   different proc_files (even open in the same process) can have the same file
-   member, but a different fd, due to it being opened twice. */
-struct proc_file {
-  struct file *file;
-  int fd;
-  struct list_elem file_elem;
-};
+static bool is_executable(const char *file);
 
 void
 syscall_init (void) 
@@ -187,13 +177,11 @@ sys_halt(void) {
    status is sent ('returned') to the kernel. */
 void
 sys_exit(int status) {
-
   struct thread *cur = thread_current();
   cur->exit_status = status;
   /* Process termination message, printing process' name and exit status. */
   printf("%s: exit(%d)\n", cur->name, status);
   thread_exit();
-
 }
 
 /* Runs the executable given in cmd_line. cmd_line includes the arguments as
@@ -284,9 +272,16 @@ sys_open(const char *file) {
   struct thread *t = thread_current();
   /* Freed in sys_close(). */
   struct proc_file *f = malloc(sizeof(struct proc_file));
+  if (f == NULL) {
+    sys_exit(-1);
+  }
   list_push_front(&t->files, &f->file_elem);
   f->file = fl;
-
+  /* If file is currently being run as an executable in this process, we must
+     not be able to write to it. */
+  if (is_executable(file)) {
+    file_deny_write(f->file);
+  }
   int file_descriptor = t->next_file_descriptor;
   f->fd = file_descriptor;
   /* Increment next_file_descirptor so that the next file to be
@@ -343,7 +338,6 @@ sys_read(int fd, void *buffer, unsigned size) {
       lock_release(&secure_file);
       return -1;
     }
-    file_deny_write(f);
     bytes = file_read(f, buffer, size);
   }
   lock_release(&secure_file);
@@ -434,8 +428,6 @@ sys_tell(int fd) {
   return position;
 }
 
-//TODO: Do we need to actually close all its open files?
-//      Or is it already done in file_close? Spec is a bit vague...
 /* Closes file descriptor fd. */
 static void
 sys_close(int fd) {
@@ -482,7 +474,6 @@ static uint32_t
 get_word_on_stack(struct intr_frame *f, int offset) 
 {
   uint32_t *esp = f->esp;
-  check_mem_ptr(esp);
   check_mem_ptr(esp + offset);
   return *(esp + offset);
 }
@@ -519,4 +510,11 @@ check_fd(int fd) {
   if (fd < 0 || fd > next_fd) {
     sys_exit(-1);
   }
+}
+
+/* Returns true if the supplied filename is the executable running in the
+   current thread/process. */
+static bool
+is_executable(const char *file) {
+  return (strcmp(file, thread_current()->executable) == 0);
 }

@@ -39,6 +39,8 @@ typedef int tid_t;
 #define READY_THREAD_COUNT_COEFFICIENT       \
                               DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60)
 
+#define MAX_FILENAME_LENGTH 14
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -147,6 +149,11 @@ struct thread
                                       be returned from sys_exec(). loaded is
                                       set to false when the thread is
                                       created. */
+    char executable[MAX_FILENAME_LENGTH]; /* In start_process(), if we load an
+                                             executable on a thread, the
+                                             thread's executable member will be
+                                             set to the filename of this
+                                             executable. */
 #endif
 
     int exit_status;
