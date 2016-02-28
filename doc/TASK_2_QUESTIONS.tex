@@ -138,10 +138,43 @@ being set to true, because we do not want to be able to wait on the same thread 
 Each open file in a process has a file descriptor that represents the file. In other words, file descriptors index the open files in a process. In our implementation, we have a \texttt{proc\_file} that has a file descriptor and the associated file. When we are given a file descriptor to access a file, we iterate over the list of \texttt{proc\_file} a thread owns stopping when the file descriptors match.
 File descriptors are unique within a single process, but not within the entire OS since they only index open files within a process, i.e, two different processes may have same file descriptors but they work independently.
 
+\subsubsection{Reading and writing user data}
 
+Before entering the specific read or write system call handler, we start by first acquiring the file descriptor, the buffer, and the size to be modified from the stack. Each item we get (fd, buffer, or size) from the stack is first checked to ensure it is a valid pointer from the user and not from the kernel. If any of these items is not a legal pointer, we exit the system with error code -1.  If the pointers are legal, we then call the function \lstinline{sys_read(fd, buffer, size)} or \lstinline{sys_write(fd, buffer, size)} that returns the number of bytes read/written and we store that value in the frame's \texttt{eax}. In detail, this is what happens in each handler:
 
+\begin{enumerate}
+\item \lstinline{sys_read()}: We first acquire a lock to ensure synchronization and check irregularities, i.e, the buffer must be a valid buffer, the fd must be a valid fd, and lastly check if the fd is 1, as this is reserved to write to the console, so we immediately exit. If not, two courses of action can occur: 
+\begin{enumerate}
+\item[a)] The file descriptor given is 0. In that case it means we are trying to read from \texttt{stdin}, so we create an array \texttt{keys}, keep reading one by one the keys pressed with \texttt{input\_getc()} and storing them in \texttt{keys}. We finally copy the contents of \texttt{keys} into the buffer, and return \texttt{size}, as this is the number of bytes read.
+\item[b)]  The file descriptor is above 1. In that case we get the file with the file descriptor \lstinline{get_file(fd)}. If no file is found, we release the lock and return -1, meaning the file could not be read. If a file is found, we then call \lstinline{file_read(f, buffer, size)}, storing in a local variable \lstinline{bytes} the number of bytes read, we release the lock, and simply return \lstinline{bytes}.
+\end{enumerate}
+\item \lstinline{sys_write()}: Like in read, we first acquire a lock to ensure synchronization and check irregularities i.e, the buffer must be a valid buffer, the fd must be a valid fd, and lastly check if the fd is 0, as this is reserved to read from the console, so we immediately exit. If not, again two courses of action can occur: 
+\begin{enumerate}
+\item[a)] The file descriptor given is 1. In that case it means we are trying to write to \lstinline{stdout}. If we are writing a fairly large amount of bytes to \lstinline{stdout}, we write \lstinline{MAX_CONSOLE_WRITE} bytes per call to \lstinline{putbuf()}, and then write the rest of the bytes, calling \lstinline{sys_write()} recursively. When we're done, we return the size given.
+\item[b)]  The file descriptor is above 1. In that case we get the file with the file descriptor \lstinline{get_file(fd)}. If no file is found, we release the lock and return -1, meaning the file could not be read. If a file is found, we then call \lstinline{file_write(f, buffer, size)}, storing in a local variable \lstinline{bytes} the number of bytes read, we release the lock, and simply return \lstinline{bytes}.
+\end{enumerate}
+\end{enumerate}
 
+\subsubsection{Inspections of the page table}
+The least number of inspections would be 1, if all the data being transferred from user space to kernel was stored in a single page. The maximum number of inspections would be 4096, if each byte was stored in a different single page. If however we are imposing that the bytes copied should be contiguous in memory then the maximum would be two, as one page is 4000 bytes. For a system call that only copies 2 bytes of data the least number of inspections would be 1, if both bytes were in the same page. The maximum number of inspections would then be 2, if again each byte was stored in a separate page. There is room for improvement if, like pointed out previously, we ensure that bytes copied from the user space are stored in contiguous blocks of memory. Take the previous example: before the maximum was 4096 inspections, but with the proposed improvement the maximum would be 2, which is 4094 inspections less (a big improvement). As with everything, there are some drawbacks to this proposition, as now the storage space is used inefficiently, most likely reducing capacity and performance.
 
+\subsubsection{Error handling}
+
+In our design, we have created a function  \lstinline{get_word_on_stack(frame, offset)} common to all system calls that deals with the process of checking for invalid pointers $and$ returning the appropiate word. We believe this encapsulates the error handling and abstracts the code of the system call handler into a more clean function. In \lstinline{get_word_on_stack()} we call \lstinline{check_mem_ptr(uaddr)} which is the actual code that checks if the pointer is null and if it is a user address, exiting if an invalid pointer is detected. So then the process of a making a system call is reduced to the following template:
+
+\begin{lstlisting}
+int sys_number = get_word_on_stack(frame, 0);  //Checks validity of esp pointer.
+switch(sys_number) {
+	.
+	.
+case(SYS_EXAMPLE):
+	int word = get_word_on_stack(frame, 1);  //Checks validity of pointers.
+	sys_example(word);
+
+}
+\end{lstlisting}
+
+This makes the system call handler function more elegant and as noted, abstracts away the process of checking validity of pointers. Finally, we ensure that all allocated resources are freed because when we call \lstinline{sys_exit} we are in turn calling \lstinline{thread_exit()} which takes care of freeing any resources used for that process. In particular, for the file system lock we always ensure we release the lock before returning.
 
 %----------------------------------------------------------------------------------------
 
