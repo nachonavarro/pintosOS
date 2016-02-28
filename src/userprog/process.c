@@ -241,7 +241,7 @@ int
 process_wait (tid_t child_tid)
 {
   struct thread *cur = thread_current();
-  /* Check that the given pid is indeed a child of the current thread. */
+  /* Check that the given tid is indeed a child of the current thread. */
   struct thread *child = NULL;
   struct list *children = &cur->children;
   struct list_elem *e;

@@ -199,7 +199,7 @@ sys_exec(const char *cmd_line) {
 
   /* We want to wait until the child has definitely loaded, and then check to
      see whether it has loaded or not (e.g. whether the filename was invalid).
-     exec_sema is initialised to 0 for a thread. We use exec_sema of the child
+     load_sema is initialised to 0 for a thread. We use load_sema of the child
      to make this function wait, by doing sema_down on the child's exec_sema. We
      will have to wait until sema_up has been called on this sema in
      start_process (after load has been called). Just before sema_up has been
@@ -507,7 +507,7 @@ static void
 check_fd(int fd) {
   struct thread *cur = thread_current();
   int next_fd = cur->next_file_descriptor;
-  if (fd < 0 || fd > next_fd) {
+  if (fd < 0 || fd >= next_fd) {
     sys_exit(-1);
   }
 }

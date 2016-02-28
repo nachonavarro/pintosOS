@@ -136,8 +136,8 @@ struct thread
                                        want to be able to wait on the same
                                        thread twice. */
     struct semaphore exit_sema;    /* Semaphore to ensure the wait system
-                                       call will wait until the thread has
-                                       exited. Initialised to 0. */
+                                      call will wait until the thread has
+                                      exited. Initialised to 0. */
     struct semaphore load_sema;    /* Semaphore to ensure the exec system call
                                       does not check to see if the child has
                                       successfully loaded until it has tried
