@@ -326,7 +326,7 @@ sys_read(int fd, void *buffer, unsigned size) {
     uint8_t keys[size];
     /* Make an array of keys pressed. */
     for (i = 0; i < size; i++) {
-      keys[size] = input_getc();
+      keys[i] = input_getc();
     }
     /* Put these keys pressed into the buffer. */
     memcpy(buffer, (const void *) keys, size);
