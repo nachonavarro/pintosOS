@@ -104,6 +104,7 @@ parse_filename_and_args (const char* file_name_and_args)
     p->argv[p->argc] = token;
     p->argc++;
 
+    /* Checking that the stack isn't overflowing */
     if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t)
         >= (uintptr_t) starting_address) {
       palloc_free_page(new_page);
