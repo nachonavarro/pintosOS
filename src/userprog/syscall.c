@@ -284,7 +284,7 @@ sys_open(const char *file) {
   }
   int file_descriptor = t->next_file_descriptor;
   f->fd = file_descriptor;
-  /* Increment next_file_descirptor so that the next file to be
+  /* Increment next_file_descriptor so that the next file to be
      opened has a different file descriptor. */
   t->next_file_descriptor++;
 
@@ -351,15 +351,7 @@ sys_read(int fd, void *buffer, unsigned size) {
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
 
-  if (fd == 0) {
-    sys_exit(-1);
-  }
-
-  if (buffer == NULL || !is_user_vaddr(buffer)
-      || pagedir_get_page(thread_current()->pagedir, buffer) == NULL) {
-    sys_exit(-1);
-  }
-
+  check_mem_ptr(buffer);
   check_fd(fd);
   check_buffer(buffer, size);
 
@@ -367,7 +359,8 @@ sys_write(int fd, const void *buffer, unsigned size) {
   lock_acquire(&secure_file);
 
   /* fd = 1 corresponds to writing to stdout. */
-  if (fd == 1) {
+  if (fd == 1) 
+  {
     /* If we are writing a fairly large amount of bytes to stdout, write
        MAX_CONSOLE_WRITE bytes per call to putbuf(), then write the rest
        of the bytes, calling sys_write() recursively. */
@@ -379,7 +372,9 @@ sys_write(int fd, const void *buffer, unsigned size) {
     }
     /* Must have successfully written all bytes we were told to. */
     bytes = size;
-  } else {
+  } 
+    else 
+  {
     struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
@@ -435,13 +430,17 @@ sys_close(int fd) {
   lock_acquire(&secure_file);
   struct thread *cur = thread_current();
   struct list_elem *e;
+
   /* Cannot use get_file() in place of the below for loop, because we need
      access to the file_elem, which is in the struct proc_file, not the
      struct file. */
-  for (e = list_begin (&cur->files); e != list_end (&cur->files);
-       e = list_next (e)) {
+  for (e = list_begin (&cur->files); 
+       e != list_end (&cur->files);
+       e = list_next (e)) 
+  {
     struct proc_file *f = list_entry(e, struct proc_file, file_elem);
-    if (fd == f->fd) {
+    if (fd == f->fd) 
+    {
       file_close(f->file);
       list_remove(&f->file_elem);
       free(f);
@@ -453,15 +452,18 @@ sys_close(int fd) {
 
 /* Returns the file corresponding the to supplied file descriptor
    in the current thread's list of files that it can see. */
-static struct file* get_file(int fd) {
+static struct file* get_file(int fd) 
+{
   struct thread *cur = thread_current();
   struct list_elem *e;
-  for (e = list_begin (&cur->files); e != list_end (&cur->files);
-       e = list_next (e)) {
+
+  for (e = list_begin (&cur->files); 
+       e != list_end (&cur->files);
+       e = list_next (e)) 
+  {
     struct proc_file *f = list_entry(e, struct proc_file, file_elem);
-    if (fd == f->fd) {
+    if (fd == f->fd) 
       return f->file;
-    }
   }
   NOT_REACHED();
   return NULL;
@@ -507,7 +509,7 @@ static void
 check_fd(int fd) {
   struct thread *cur = thread_current();
   int next_fd = cur->next_file_descriptor;
-  if (fd < 0 || fd >= next_fd) {
+  if (fd <= 0 || fd >= next_fd) {
     sys_exit(-1);
   }
 }

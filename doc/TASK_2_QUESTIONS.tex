@@ -36,7 +36,7 @@
 % Set up the header and footer
 \pagestyle{fancy}
 \lhead{Group 18} % Top left header
-\chead{Task 1: Scheduling} % Top center head
+\chead{Task 2: User Programs} % Top center head
 \rhead{\firstxmark} % Top right header
 \lfoot{\lastxmark} % Bottom left footer
 \rfoot{Page\ \thepage\ of\ \protect\pageref{LastPage}} % Bottom right footer
@@ -68,6 +68,51 @@
 \newpage
 
 \section{Design Questions: Argument Passing}
+
+\subsection{Purpose of new Data Structures}
+
+\begin{itemize}
+\item \begin{lstlisting}
+struct process_info {
+  char *filename;
+  int   argc;
+  char *argv[];
+};
+\end{lstlisting}
+
+\item This new struct represents the information linked to a process: its file name (a string), its number of arguments (an int) and a list of arguments (represented by an array of strings). 
+\end{itemize}
+
+
+\subsection{Algorithms: Implementation of Argument Parsing}
+
+The following steps are taken in order to parse the file's arguments:
+
+\begin{itemize}
+
+\item We allocate memory for a new struct \texttt{process\_info} by using the \texttt{palloc\_get\_page()} method.
+\item We create a copy of the given unparsed, const string by using the \texttt{memcpy()} method, after having checked that we have enough space in memory to do so. This is done because the \texttt{strtok\_r} method needs a modifiable string to tokenise.
+\item We then use the \texttt{strtok\_r()} method in a loop to tokenise the given string into arguments each time we encounter a space character. If the \texttt{NULL} token is found, this means we have reached the end of the string and therefore all the arguments have been parsed. We store each token in the \texttt{argv} array of our \texttt{process\_info} struct and we increment \texttt{argc} in each iteration of the loop to reflect the number of tokens and therefore of arguments. We also check in every iteration of the tokenising loop that we have enough space in memory to store the next tokenised argument in our \texttt{process\_info} struct.
+\item The use of \texttt{strtok\_r()} makes sure that the arguments are stored in the right order in the \texttt{argv} field of the struct, which allows a safe and correct setup of the stack when pushing the arguments in \texttt{start\_process()}.
+We indeed push the arguments in reverse order when setting up the stack as the stack grows downwards.
+
+\end{itemize}
+
+\subsection{Rationale}
+
+\subsubsection{Implementing \texttt{strtok\_r} but not \texttt{strtok}}
+
+The standard \texttt{strtok()} method is not implemented as it is unsafe to use in threaded programs such as kernels. It indeed uses global data: it stores intermediate variables globally (specifically, a static buffer while parsing) which are reused at each call. We therefore need a re-entrant function, which is a function that can be invoked while already in the process of executing. The \texttt{strtok\_r()} method offers this by storing its data locally in a modifiable string, which makes it safe to use in threaded programs such as kernels.
+
+\subsubsection{Advantages of separating command with the shell}
+
+Separating commands into process name and arguments in the shell, as is implemented in the UNIX operating system, offers multiple advantages when we compare it to separating the commands in the kernel as is implemented in the Pintos operating system.
+
+Firstly, it is more secure as the user typically should never directly interact with the kernel. Indeed, the kernel should never be accessed by the user by using abstraction as it is only responsible for starting and executing system processes. The shell, however, is a layer of abstraction created for the user to communicate with the kernel and ask it to run certain processes when needed. For instance, the shell is an utility that will check for any unsafe commands before communicating with the kernel itself. It does not have any system privileges, but once the kernel is called then it has access to all system processes.
+
+Secondly, it offers better performance. Indeed, in cases of redirection in shell operations, such as when the program invoked is a shell command, the shell can execute it directly without having to communicate with the kernel. If the command is not a shell command, then the kernel is invoked to execute the program. This allows for better performance and speed in the execution of programs.
+
+
 \section{Design Questions: System Calls}
 \subsection{Data Structures}
 \subsubsection{Purpose of new variables and \texttt{struct} members}

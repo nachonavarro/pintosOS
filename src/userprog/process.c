@@ -72,6 +72,13 @@ parse_filename_and_args (const char* file_name_and_args)
   void *new_page = palloc_get_page(0);
   struct process_info *p = new_page;
 
+  /* Checking the page allocation worked correctly */
+  if (p == NULL)
+  {
+    palloc_free_page(new_page);
+    return NULL;
+  }
+
   /* Create copy of file_name_and_args const string as strtok_r needs modifiable 
      string for tokenising */
   int arg_length = strlen(file_name_and_args) + 1;
@@ -85,6 +92,7 @@ parse_filename_and_args (const char* file_name_and_args)
   }
 
   memcpy(starting_address, file_name_and_args, arg_length);
+  char *name_args_copy = starting_address;
 
   /* Declaring helper pointers for strtok_r method */
   char *save_ptr;
@@ -94,19 +102,20 @@ parse_filename_and_args (const char* file_name_and_args)
   p->argc = 0;
 
   /* Tokenising the arguments and setting them in the process_info struct */
-  for (char *name_args_copy = starting_address; ; name_args_copy = NULL) 
+  for (token = strtok_r (name_args_copy, " ", &save_ptr); 
+       token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) 
   {
-    token = strtok_r(name_args_copy, " ", &save_ptr);
 
-    if (token == NULL) 
-      break;
-
+    /* Setting the tokenised argument in argv of the process_info struct 
+       and incrementing argc */
     p->argv[p->argc] = token;
     p->argc++;
 
     /* Checking that the stack isn't overflowing */
-    if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t)
-        >= (uintptr_t) starting_address) {
+    if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t) 
+         >= (uintptr_t) starting_address) 
+    {
       palloc_free_page(new_page);
       return NULL;
     }
