@@ -255,7 +255,8 @@ process_wait (tid_t child_tid)
   struct thread *child = NULL;
   struct list *children = &cur->children;
   struct list_elem *e;
-  for (e = list_begin(children); e != list_end(children); e = list_next(e)) {
+  for (e = list_begin(children); e != list_end(children); e = list_next(e)) 
+  {
     struct thread *t = list_entry(e, struct thread, child_elem);
     if (t->tid == child_tid) {
       child = t;
@@ -278,6 +279,7 @@ process_wait (tid_t child_tid)
      thread. */
   child->waited_on = true;
 
+
   /* Wait for child to terminate, then return it's exit status.
      Instead of a busy wait, give each thread a semaphore, initialised
      to 0 on initialising thread, then try to do sema_down here, which
@@ -293,7 +295,9 @@ process_wait (tid_t child_tid)
      still just return exit_status in the case that the process was
      terminated by the kernel. */
   //TODO: Do all kernel terminations incur a page fault???
-  return child->exit_status;
+  int ret = child->exit_status;
+  sema_up(&child->before_exit_sema);
+  return ret;
 
 }
 
@@ -443,8 +447,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-//  // ADDED
-//  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
