@@ -166,7 +166,8 @@ syscall_handler (struct intr_frame *f)
    Should rarely be used, as some information is lost
    (such as information about possible deadlocks). */
 static void
-sys_halt(void) {
+sys_halt(void) 
+{
   shutdown_power_off();
 }
 
@@ -176,7 +177,8 @@ sys_halt(void) {
    an error. After this function is called in syscall_handler(), the exit
    status is sent ('returned') to the kernel. */
 void
-sys_exit(int status) {
+sys_exit(int status) 
+{
   struct thread *cur = thread_current();
   cur->exit_status = status;
   /* Process termination message, printing process' name and exit status. */
@@ -190,7 +192,8 @@ sys_exit(int status) {
    syscall_handler(), the new process' id is sent to the kernel. Parent/Child
    relationship is set in process_execute(). */
 static pid_t
-sys_exec(const char *cmd_line) {
+sys_exec(const char *cmd_line) 
+{
   check_mem_ptr(cmd_line);
   lock_acquire(&secure_file);
 
@@ -209,11 +212,12 @@ sys_exec(const char *cmd_line) {
   enum intr_level old_level = intr_disable();
   struct thread *child = tid_to_thread((tid_t)pid);
   intr_set_level(old_level);
+
   sema_down(&child->load_sema);
   lock_release(&secure_file);
-  if (!(child->loaded)) {
+
+  if (!(child->loaded))
     return PID_ERROR;
-  }
 
   return pid;
 }
@@ -221,22 +225,25 @@ sys_exec(const char *cmd_line) {
 /* Waits for a child process pid, and then returns the child's exit status.
    See process_wait() for more information on what exactly happens here. */
 static int
-sys_wait(pid_t pid) {
+sys_wait(pid_t pid) 
+{
   return process_wait((tid_t) pid);
 }
 
 /* Creates file called 'file' that is initially 'initial_size' bytes.
    Returns true if successful. Creating a file does NOT open it. */
 static bool
-sys_create(const char *file, unsigned initial_size) {
+sys_create(const char *file, unsigned initial_size) 
+{
   check_mem_ptr(file);
-  if (file == NULL) {
+
+  if (file == NULL)
     sys_exit(ERROR);
-  }
 
   lock_acquire(&secure_file);
   bool success = filesys_create(file, initial_size);
   lock_release(&secure_file);
+
   return success;
 }
 
@@ -244,10 +251,12 @@ sys_create(const char *file, unsigned initial_size) {
    (including when no file named 'file' exists). An open file can be removed,
    but it is not closed. */
 static bool
-sys_remove(const char *file) {
+sys_remove(const char *file) 
+{
   lock_acquire(&secure_file);
   bool success = filesys_remove(file);
   lock_release(&secure_file);
+
   return success;
 }
 
@@ -257,16 +266,18 @@ sys_remove(const char *file) {
    STDIN_FILENO, fd = 1 is STDOUT_FILENO - These are never returned here.
    If file could not be opened, -1 is returned. */
 static int
-sys_open(const char *file) {
+sys_open(const char *file) 
+{
   check_mem_ptr(file);
-  if (file == NULL) {
+
+  if (file == NULL)
     sys_exit(ERROR);
-  }
 
   lock_acquire(&secure_file);
 
   struct file *fl = filesys_open(file);
-  if (fl == NULL) {
+  if (fl == NULL) 
+  {
     lock_release(&secure_file);
     return FD_ERROR;
   }
@@ -274,16 +285,17 @@ sys_open(const char *file) {
   struct thread *t = thread_current();
   /* Freed in sys_close(). */
   struct proc_file *f = malloc(sizeof(struct proc_file));
-  if (f == NULL) {
+
+  if (f == NULL)
     sys_exit(FD_ERROR);
-  }
+
   list_push_front(&t->files, &f->file_elem);
   f->file = fl;
   /* If file is currently being run as an executable in this process, we must
      not be able to write to it. */
-  if (is_executable(file)) {
+  if (is_executable(file))
     file_deny_write(f->file);
-  }
+
   int file_descriptor = t->next_file_descriptor;
   f->fd = file_descriptor;
   /* Increment next_file_descriptor so that the next file to be
@@ -297,13 +309,15 @@ sys_open(const char *file) {
 
 /* Returns size, in bytes, of file open as 'fd'. */
 static int
-sys_filesize(int fd) {
+sys_filesize(int fd) 
+{
   check_fd(fd);
 
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
   int length = file_length(f);
   lock_release(&secure_file);
+
   return length;
 }
 
@@ -311,11 +325,12 @@ sys_filesize(int fd) {
    bytes actually read - 0 at end of file, or -1 if file could not be read.
    fd = 0 reads from the keyboard. */
 static int
-sys_read(int fd, void *buffer, unsigned size) {
+sys_read(int fd, void *buffer, unsigned size) 
+{
   /* Cannot read from stdout. */
-  if (fd == STDOUT_FILENO) {
+  if (fd == STDOUT_FILENO)
     sys_exit(ERROR);
-  }
+
   check_fd(fd);
   check_buffer(buffer, size);
 
@@ -324,11 +339,13 @@ sys_read(int fd, void *buffer, unsigned size) {
   lock_acquire(&secure_file);
 
   /* fd = 0 corresponds to reading from stdin. */
-  if (fd == STDIN_FILENO) {
+  if (fd == STDIN_FILENO) 
+  {
     unsigned i;
     uint8_t keys[size];
     /* Make an array of keys pressed. */
-    for (i = 0; i < size; i++) {
+    for (i = 0; i < size; i++) 
+    {
       keys[i] = input_getc();
     }
     /* Put these keys pressed into the buffer. */
@@ -336,13 +353,16 @@ sys_read(int fd, void *buffer, unsigned size) {
     /* Must have successfully read all bytes we were told to. */
     bytes = size;
   } else {
+
     struct file *f = get_file(fd);
-    if (!f) {
+    if (!f) 
+    {
       lock_release(&secure_file);
       return ERROR;
     }
     bytes = file_read(f, buffer, size);
   }
+
   lock_release(&secure_file);
   return bytes;
 }
@@ -352,11 +372,11 @@ sys_read(int fd, void *buffer, unsigned size) {
    get to the end of the file, just stop writing and return the number of
    bytes already written. fd = 1 writes to the console. */
 static int
-sys_write(int fd, const void *buffer, unsigned size) {
+sys_write(int fd, const void *buffer, unsigned size) 
+{
 
-  if (fd == STDIN_FILENO) {
+  if (fd == STDIN_FILENO)
     sys_exit(ERROR);
-  }
 
   check_mem_ptr(buffer);
   check_fd(fd);
@@ -373,6 +393,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
        of the bytes, calling sys_write() recursively. */
     if (size < MAX_CONSOLE_WRITE) {
       putbuf(buffer, size);
+
     } else {
       putbuf(buffer, MAX_CONSOLE_WRITE);
       sys_write(fd, buffer + MAX_CONSOLE_WRITE, size - MAX_CONSOLE_WRITE);
@@ -383,7 +404,8 @@ sys_write(int fd, const void *buffer, unsigned size) {
     else 
   {
     struct file *f = get_file(fd);
-    if (f == NULL) {
+    if (f == NULL) 
+    {
       lock_release(&secure_file);
       return ERROR;
     }
@@ -399,15 +421,19 @@ sys_write(int fd, const void *buffer, unsigned size) {
 /* Changes the next byte to be read or written in open file 'fd' to
    'position' (in bytes, from start of file). */
 static void
-sys_seek(int fd, unsigned position) {
+sys_seek(int fd, unsigned position) 
+{
   check_fd(fd);
 
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
-  if (f == NULL) {
+
+  if (f == NULL) 
+  {
     lock_release(&secure_file);
     return;
   }
+
   file_seek(f, position);
   lock_release(&secure_file);
 }
@@ -415,15 +441,19 @@ sys_seek(int fd, unsigned position) {
 /* Returns the position of the next byte to be read or written in open
    file 'fd' (in bytes, from start of file). */
 static unsigned
-sys_tell(int fd) {
+sys_tell(int fd) 
+{
   check_fd(fd);
 
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
-  if (f == NULL) {
+
+  if (f == NULL) 
+  {
     lock_release(&secure_file);
     sys_exit(ERROR);
   }
+
   int position = file_tell(f);
   lock_release(&secure_file);
 
@@ -432,7 +462,8 @@ sys_tell(int fd) {
 
 /* Closes file descriptor fd. */
 static void
-sys_close(int fd) {
+sys_close(int fd) 
+{
   check_fd(fd);
   lock_acquire(&secure_file);
   struct thread *cur = thread_current();
@@ -493,37 +524,39 @@ static void
 check_mem_ptr(const void *uaddr) 
 {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
-      || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
+      || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL)
     sys_exit(ERROR);
-  }
 }
 
 /* Checks that all of the buffer that we are writing/reading from is valid. */
 static void
 check_buffer(const void *buffer, unsigned size)
 {
-	char *buf = (char *) buffer;
-	unsigned i;
-	for (i = 0; i < size; i++) {
-		check_mem_ptr(buf);
-		buf++;
-	}
+  char *buf = (char *) buffer;
+  unsigned i;
+  for (i = 0; i < size; i++) 
+  {
+    check_mem_ptr(buf);
+    buf++;
+  }
 }
 
 /* Checks that the given file descriptor is valid. File descriptors cannot
    be less than 0. */
 static void
-check_fd(int fd) {
+check_fd(int fd) 
+{
   struct thread *cur = thread_current();
   int next_fd = cur->next_file_descriptor;
-  if (fd < 0 || fd >= next_fd) {
+
+  if (fd < 0 || fd >= next_fd)
     sys_exit(ERROR);
-  }
 }
 
 /* Returns true if the supplied filename is the executable running in the
    current thread/process. */
 static bool
-is_executable(const char *file) {
+is_executable(const char *file) 
+{
   return (strcmp(file, thread_current()->executable) == 0);
 }

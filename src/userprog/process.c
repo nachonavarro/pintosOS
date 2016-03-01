@@ -302,9 +302,8 @@ process_wait (tid_t child_tid)
      can just return exit status. */
   sema_down(&child->exit_sema);
 
-  /* Don't remove from the terminated child from the parents list of children,
-     because we still want to be able to check to see if we have already called
-     wait on this child. */
+  /* Removing the terminated child from the parents list of children */
+  list_remove(&child->child_elem);
 
   /* Have changed page_fault() to set exit status to -1, so we can
      still just return exit_status in the case that the process was
