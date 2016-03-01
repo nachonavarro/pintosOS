@@ -151,11 +151,10 @@ struct thread
                                       be returned from sys_exec(). loaded is
                                       set to false when the thread is
                                       created. */
-    char executable[NAME_MAX]; /* In start_process(), if we load an
-                                             executable on a thread, the
-                                             thread's executable member will be
-                                             set to the filename of this
-                                             executable. */
+    char executable[NAME_MAX]; /* In start_process(), if we load an executable
+                                  on a thread, the thread's executable member
+                                  will be set to the filename of this
+                                  executable. */
 #endif
 
     int exit_status;
