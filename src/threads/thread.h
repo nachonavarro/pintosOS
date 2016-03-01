@@ -39,6 +39,8 @@ typedef int tid_t;
 #define READY_THREAD_COUNT_COEFFICIENT       \
                               DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60)
 
+#define MAX_FILENAME_LENGTH 14
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -124,9 +126,43 @@ struct thread
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                 /* Page directory. */
+    uint32_t *pagedir;              /* Page directory. */
+    struct list children;           /* List of child threads of this thread. */
+    struct list_elem child_elem;    /* list_elem for to be put in list of
+                                       another thread's children. */
+    bool waited_on;                 /* True if thread's parent has waited on
+                                       this thread. Never set to false after
+                                       being set to true, because we do not
+                                       want to be able to wait on the same
+                                       thread twice. */
+    struct semaphore exit_sema;    /* Semaphore to ensure the wait system
+                                      call will wait until the thread has
+                                      exited. Initialised to 0. */
+    struct semaphore load_sema;    /* Semaphore to ensure the exec system call
+                                      does not check to see if the child has
+                                      successfully loaded until it has tried
+                                      to be loaded. */
+    bool loaded;                   /* Set to the return value of load() in
+                                      start_process(), so that sys_exec() can
+                                      check whether the child loaded
+                                      successfully or not, as if not, -1 should
+                                      be returned from sys_exec(). loaded is
+                                      set to false when the thread is
+                                      created. */
+    char executable[MAX_FILENAME_LENGTH]; /* In start_process(), if we load an
+                                             executable on a thread, the
+                                             thread's executable member will be
+                                             set to the filename of this
+                                             executable. */
 #endif
 
+    int exit_status;
+    struct list files;            /* List of files that a thread has open (Same
+                                     file can be open with different fd). */
+    int next_file_descriptor;     /* Next file to be opened by this
+                                     process/thread will take this as its'
+                                     file descriptor. Incremented after a
+                                     file is opened. */
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };
@@ -158,6 +194,8 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+struct thread *tid_to_thread(tid_t tid);
 
 /* PART 1: Priority scheduling */
 void thread_donate_priority (struct thread *t, int priority);

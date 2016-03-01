@@ -379,7 +379,11 @@ thread_exit (void)
   }
 
   list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
+  struct thread *cur = thread_current();
+#ifdef USERPROG
+  sema_up(&cur->exit_sema);
+#endif
+  cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -819,6 +823,17 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
 
+#ifdef USERPROG
+  list_init(&t->children);
+  t->waited_on = false;
+  //TODO: Should we move this to process_execute?
+  //      (And would this stop us having to use strcmp for
+  //      main below? Would it still work in all other cases?)
+  if (strcmp(name, "main") != 0) {
+    list_push_front(&thread_current()->children, &t->child_elem);
+  }
+#endif
+
   if(!thread_mlfqs) {
     t->base_priority = t->effective_priority = priority;
   }
@@ -828,7 +843,23 @@ init_thread (struct thread *t, const char *name, int priority)
   /* Initialise semaphore to 0 to synchronise sleeping threads. */
   t->waiting_on_lock = NULL;
   sema_init(&t->timer_wait_sema, 0);
+  /* sema_down() called on exit_sema in process_wait(). sema_up() only
+     called in thread_exit(). This means the wait system call cannot
+     return the exit status until thread has terminated. */
+  sema_init(&t->exit_sema, 0);
+  /* sema_down() called on load_sema in sys_exec(). sema_up() only
+     called in start_process() when thread has successfully loaded.
+     This means that the exec system call will wait until the
+     thread has successfully loaded before checking whether it
+     loaded, so it can decide whether to return an error or not. */
+  sema_init(&t->load_sema, 0);
   t->magic = THREAD_MAGIC;
+
+  list_init(&t->files);
+
+  /* First file descriptor for a process' open file is 2, as 0 and 1 are
+     reserved for input and output, respectively. */
+  t->next_file_descriptor = 2;
 
   if (thread_mlfqs) {
 
@@ -982,4 +1013,22 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 bool
 is_idle_thread(struct thread *t){
   return t==idle_thread;
+}
+
+struct thread *
+tid_to_thread(tid_t tid) {
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&all_list);
+       e != list_end (&all_list);
+       e = list_next (e)) {
+    struct thread *t = list_entry (e, struct thread, allelem);
+    if (t->tid == tid) {
+      return t;
+    }
+  }
+  NOT_REACHED();
+  return NULL;
 }
