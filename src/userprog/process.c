@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -71,6 +72,13 @@ parse_filename_and_args (const char* file_name_and_args)
   void *new_page = palloc_get_page(0);
   struct process_info *p = new_page;
 
+  /* Checking the page allocation worked correctly */
+  if (p == NULL)
+  {
+    palloc_free_page(new_page);
+    return NULL;
+  }
+
   /* Create copy of file_name_and_args const string as strtok_r needs modifiable 
      string for tokenising */
   int arg_length = strlen(file_name_and_args) + 1;
@@ -84,6 +92,7 @@ parse_filename_and_args (const char* file_name_and_args)
   }
 
   memcpy(starting_address, file_name_and_args, arg_length);
+  char *name_args_copy = starting_address;
 
   /* Declaring helper pointers for strtok_r method */
   char *save_ptr;
@@ -93,25 +102,28 @@ parse_filename_and_args (const char* file_name_and_args)
   p->argc = 0;
 
   /* Tokenising the arguments and setting them in the process_info struct */
-  for (char *name_args_copy = starting_address; ; name_args_copy = NULL) 
+  for (token = strtok_r (name_args_copy, " ", &save_ptr); 
+       token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) 
   {
-    token = strtok_r(name_args_copy, " ", &save_ptr);
 
-    if (token == NULL) 
-      break;
-
+    /* Setting the tokenised argument in argv of the process_info struct 
+       and incrementing argc */
     p->argv[p->argc] = token;
     p->argc++;
 
-    if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t)
-        >= (uintptr_t) starting_address) {
+    /* Checking that the stack isn't overflowing */
+    if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t) 
+         >= (uintptr_t) starting_address) 
+    {
       palloc_free_page(new_page);
       return NULL;
     }
   }
 
-  /* File name is the first token */
+  /* File name is the first token in argv */
   p->filename = p->argv[0];
+  ASSERT(strlen(p->filename) <= NAME_MAX);
 
   return p;
 }
@@ -206,9 +218,6 @@ push_arguments_on_stack(struct process_info *p, void **esp)
 
   /* Pushing fake return address */
   put_uint_in_stack(esp, 0);
-
-  // TODO: Use hex_dump() to test this is working!
-  // hex_dump(if_.esp,if_.esp,size,true);
 }
 
 /* Pushes a string onto the stack at the next location given by the stack ptr */
@@ -239,11 +248,12 @@ int
 process_wait (tid_t child_tid)
 {
   struct thread *cur = thread_current();
-  /* Check that the given pid is indeed a child of the current thread. */
+  /* Check that the given tid is indeed a child of the current thread. */
   struct thread *child = NULL;
   struct list *children = &cur->children;
   struct list_elem *e;
-  for (e = list_begin(children); e != list_end(children); e = list_next(e)) {
+  for (e = list_begin(children); e != list_end(children); e = list_next(e)) 
+  {
     struct thread *t = list_entry(e, struct thread, child_elem);
     if (t->tid == child_tid) {
       child = t;
@@ -251,13 +261,11 @@ process_wait (tid_t child_tid)
     }
   }
 
-  //TODO: Not sure if there will be a problem in main when process_wait is
-  //      called because of never returning.
   /* If pid does not refer to a direct child of the calling process, -1
      is returned. -1 is also returned if wait has already been called on
      this thread. */
   if (child == NULL || child->waited_on) {
-    return -1;
+    return ERROR;
   }
 
   /* Don't need to set to false again, because the thread will be
@@ -280,8 +288,9 @@ process_wait (tid_t child_tid)
   /* Have changed page_fault() to set exit status to -1, so we can
      still just return exit_status in the case that the process was
      terminated by the kernel. */
-  //TODO: Do all kernel terminations incur a page fault???
-  return child->exit_status;
+  int ret = child->exit_status;
+  sema_up(&child->before_exit_sema);
+  return ret;
 
 }
 
@@ -431,8 +440,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-//  // ADDED
-//  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

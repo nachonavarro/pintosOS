@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <threads/synch.h>
 #include "fixed-point.h"
+#include "filesys/directory.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -39,7 +40,7 @@ typedef int tid_t;
 #define READY_THREAD_COUNT_COEFFICIENT       \
                               DIV_FIXED_POINT_BY_INT(TO_FIXED_POINT(1), 60)
 
-#define MAX_FILENAME_LENGTH 14
+#define FD_ERROR -1
 
 /* A kernel thread or user process.
 
@@ -149,7 +150,7 @@ struct thread
                                       be returned from sys_exec(). loaded is
                                       set to false when the thread is
                                       created. */
-    char executable[MAX_FILENAME_LENGTH]; /* In start_process(), if we load an
+    char executable[NAME_MAX]; /* In start_process(), if we load an
                                              executable on a thread, the
                                              thread's executable member will be
                                              set to the filename of this

@@ -11,6 +11,7 @@
 #include "devices/input.h"
 #include "threads/malloc.h"
 #include "lib/string.h"
+#include "lib/user/syscall.h"
 
 /* Ensures multiple threads cannot call file system code at the same time. */
 struct lock secure_file;
@@ -51,7 +52,6 @@ syscall_handler (struct intr_frame *f)
   /* Check to see that we can read supplied user memory pointer, using the
      check_mem_ptr helper() function, in get_word_from_stack(). If the
      check fails, the process is terminated. */
-  //TODO: Do we need to check when writing? (Just when doing f->eax = ...??)
 
   int syscall_number = (int)get_word_on_stack(f, 0);
 
@@ -192,6 +192,7 @@ sys_exit(int status) {
 static pid_t
 sys_exec(const char *cmd_line) {
   check_mem_ptr(cmd_line);
+  lock_acquire(&secure_file);
 
   /* Identity mapping between thread id and process id, because
      Pintos is not multithreaded. */
@@ -199,7 +200,7 @@ sys_exec(const char *cmd_line) {
 
   /* We want to wait until the child has definitely loaded, and then check to
      see whether it has loaded or not (e.g. whether the filename was invalid).
-     exec_sema is initialised to 0 for a thread. We use exec_sema of the child
+     load_sema is initialised to 0 for a thread. We use load_sema of the child
      to make this function wait, by doing sema_down on the child's exec_sema. We
      will have to wait until sema_up has been called on this sema in
      start_process (after load has been called). Just before sema_up has been
@@ -209,8 +210,9 @@ sys_exec(const char *cmd_line) {
   struct thread *child = tid_to_thread((tid_t)pid);
   intr_set_level(old_level);
   sema_down(&child->load_sema);
+  lock_release(&secure_file);
   if (!(child->loaded)) {
-    return -1;
+    return PID_ERROR;
   }
 
   return pid;
@@ -229,7 +231,7 @@ static bool
 sys_create(const char *file, unsigned initial_size) {
   check_mem_ptr(file);
   if (file == NULL) {
-    sys_exit(-1);
+    sys_exit(ERROR);
   }
 
   lock_acquire(&secure_file);
@@ -258,7 +260,7 @@ static int
 sys_open(const char *file) {
   check_mem_ptr(file);
   if (file == NULL) {
-    sys_exit(-1);
+    sys_exit(ERROR);
   }
 
   lock_acquire(&secure_file);
@@ -266,14 +268,14 @@ sys_open(const char *file) {
   struct file *fl = filesys_open(file);
   if (fl == NULL) {
     lock_release(&secure_file);
-    return -1;
+    return FD_ERROR;
   }
 
   struct thread *t = thread_current();
   /* Freed in sys_close(). */
   struct proc_file *f = malloc(sizeof(struct proc_file));
   if (f == NULL) {
-    sys_exit(-1);
+    sys_exit(FD_ERROR);
   }
   list_push_front(&t->files, &f->file_elem);
   f->file = fl;
@@ -284,7 +286,7 @@ sys_open(const char *file) {
   }
   int file_descriptor = t->next_file_descriptor;
   f->fd = file_descriptor;
-  /* Increment next_file_descirptor so that the next file to be
+  /* Increment next_file_descriptor so that the next file to be
      opened has a different file descriptor. */
   t->next_file_descriptor++;
 
@@ -310,8 +312,9 @@ sys_filesize(int fd) {
    fd = 0 reads from the keyboard. */
 static int
 sys_read(int fd, void *buffer, unsigned size) {
-  if (fd == 1) {
-    sys_exit(-1);
+  /* Cannot read from stdout. */
+  if (fd == STDOUT_FILENO) {
+    sys_exit(ERROR);
   }
   check_fd(fd);
   check_buffer(buffer, size);
@@ -321,12 +324,12 @@ sys_read(int fd, void *buffer, unsigned size) {
   lock_acquire(&secure_file);
 
   /* fd = 0 corresponds to reading from stdin. */
-  if (fd == 0) {
+  if (fd == STDIN_FILENO) {
     unsigned i;
     uint8_t keys[size];
     /* Make an array of keys pressed. */
     for (i = 0; i < size; i++) {
-      keys[size] = input_getc();
+      keys[i] = input_getc();
     }
     /* Put these keys pressed into the buffer. */
     memcpy(buffer, (const void *) keys, size);
@@ -336,7 +339,7 @@ sys_read(int fd, void *buffer, unsigned size) {
     struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
-      return -1;
+      return ERROR;
     }
     bytes = file_read(f, buffer, size);
   }
@@ -351,15 +354,11 @@ sys_read(int fd, void *buffer, unsigned size) {
 static int
 sys_write(int fd, const void *buffer, unsigned size) {
 
-  if (fd == 0) {
-    sys_exit(-1);
+  if (fd == STDIN_FILENO) {
+    sys_exit(ERROR);
   }
 
-  if (buffer == NULL || !is_user_vaddr(buffer)
-      || pagedir_get_page(thread_current()->pagedir, buffer) == NULL) {
-    sys_exit(-1);
-  }
-
+  check_mem_ptr(buffer);
   check_fd(fd);
   check_buffer(buffer, size);
 
@@ -367,7 +366,8 @@ sys_write(int fd, const void *buffer, unsigned size) {
   lock_acquire(&secure_file);
 
   /* fd = 1 corresponds to writing to stdout. */
-  if (fd == 1) {
+  if (fd == STDOUT_FILENO)
+  {
     /* If we are writing a fairly large amount of bytes to stdout, write
        MAX_CONSOLE_WRITE bytes per call to putbuf(), then write the rest
        of the bytes, calling sys_write() recursively. */
@@ -379,11 +379,13 @@ sys_write(int fd, const void *buffer, unsigned size) {
     }
     /* Must have successfully written all bytes we were told to. */
     bytes = size;
-  } else {
+  } 
+    else 
+  {
     struct file *f = get_file(fd);
     if (!f) {
       lock_release(&secure_file);
-      return -1;
+      return ERROR;
     }
     bytes = file_write(f, buffer, size);
   }
@@ -420,7 +422,7 @@ sys_tell(int fd) {
   struct file *f = get_file(fd);
   if (!f) {
     lock_release(&secure_file);
-    sys_exit(-1);
+    sys_exit(ERROR);
   }
   int position = file_tell(f);
   lock_release(&secure_file);
@@ -435,13 +437,17 @@ sys_close(int fd) {
   lock_acquire(&secure_file);
   struct thread *cur = thread_current();
   struct list_elem *e;
+
   /* Cannot use get_file() in place of the below for loop, because we need
      access to the file_elem, which is in the struct proc_file, not the
      struct file. */
-  for (e = list_begin (&cur->files); e != list_end (&cur->files);
-       e = list_next (e)) {
+  for (e = list_begin (&cur->files); 
+       e != list_end (&cur->files);
+       e = list_next (e)) 
+  {
     struct proc_file *f = list_entry(e, struct proc_file, file_elem);
-    if (fd == f->fd) {
+    if (fd == f->fd) 
+    {
       file_close(f->file);
       list_remove(&f->file_elem);
       free(f);
@@ -453,15 +459,18 @@ sys_close(int fd) {
 
 /* Returns the file corresponding the to supplied file descriptor
    in the current thread's list of files that it can see. */
-static struct file* get_file(int fd) {
+static struct file* get_file(int fd) 
+{
   struct thread *cur = thread_current();
   struct list_elem *e;
-  for (e = list_begin (&cur->files); e != list_end (&cur->files);
-       e = list_next (e)) {
+
+  for (e = list_begin (&cur->files); 
+       e != list_end (&cur->files);
+       e = list_next (e)) 
+  {
     struct proc_file *f = list_entry(e, struct proc_file, file_elem);
-    if (fd == f->fd) {
+    if (fd == f->fd) 
       return f->file;
-    }
   }
   NOT_REACHED();
   return NULL;
@@ -485,7 +494,7 @@ check_mem_ptr(const void *uaddr)
 {
   if (uaddr == NULL || !is_user_vaddr(uaddr)
       || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
-    sys_exit(-1);
+    sys_exit(ERROR);
   }
 }
 
@@ -507,8 +516,8 @@ static void
 check_fd(int fd) {
   struct thread *cur = thread_current();
   int next_fd = cur->next_file_descriptor;
-  if (fd < 0 || fd > next_fd) {
-    sys_exit(-1);
+  if (fd < 0 || fd >= next_fd) {
+    sys_exit(ERROR);
   }
 }
 

@@ -7,6 +7,7 @@
 /* Maximum number of bytes allowed to be written to the console with a
    single putbuf() */
 #define MAX_CONSOLE_WRITE 300
+#define ERROR -1
 
 /* Process file. Each thread (i.e. process, as Pintos is not multithreaded)
    has a list of proc_files to represent the file descriptors it has open. Two

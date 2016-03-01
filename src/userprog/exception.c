@@ -4,6 +4,7 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/syscall.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -138,7 +139,7 @@ page_fault (struct intr_frame *f)
 
 
   /* Exit status set to -1 when exception causes process to exit. */
-  thread_current()->exit_status = -1;
+  thread_current()->exit_status = ERROR;
 
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
@@ -153,7 +154,7 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   if (user) {
-	  sys_exit(-1);
+	  sys_exit(ERROR);
   }
 
   /* To implement virtual memory, delete the rest of the function

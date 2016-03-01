@@ -826,9 +826,6 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   list_init(&t->children);
   t->waited_on = false;
-  //TODO: Should we move this to process_execute?
-  //      (And would this stop us having to use strcmp for
-  //      main below? Would it still work in all other cases?)
   if (strcmp(name, "main") != 0) {
     list_push_front(&thread_current()->children, &t->child_elem);
   }
