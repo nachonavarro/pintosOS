@@ -841,6 +841,7 @@ init_thread (struct thread *t, const char *name, int priority)
   /* Initialise semaphore to 0 to synchronise sleeping threads. */
   t->waiting_on_lock = NULL;
   sema_init(&t->timer_wait_sema, 0);
+#ifdef USERPROG
   /* sema_down() called on exit_sema in process_wait(). sema_up() only
      called in thread_exit(). This means the wait system call cannot
      return the exit status until thread has terminated. */
@@ -853,6 +854,7 @@ init_thread (struct thread *t, const char *name, int priority)
      thread has successfully loaded before checking whether it
      loaded, so it can decide whether to return an error or not. */
   sema_init(&t->load_sema, 0);
+#endif
   t->magic = THREAD_MAGIC;
 
   list_init(&t->files);

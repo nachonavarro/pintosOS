@@ -139,7 +139,15 @@ struct thread
     struct semaphore exit_sema;    /* Semaphore to ensure the wait system
                                       call will wait until the thread has
                                       exited. Initialised to 0. */
-    struct semaphore  before_exit_sema;
+    struct semaphore before_exit_sema; /* Semaphore used to ensure that a
+                                          thread cannot exit until we have
+                                          obtained its exit status at the end
+                                          of a call to process_wait().
+                                          Intialised to 0 when a thread is
+                                          created. sema_down called in
+                                          thread_exit to stop the thread being
+                                          terminated until sema_up is called at
+                                          the end of process_wait. */
     struct semaphore load_sema;    /* Semaphore to ensure the exec system call
                                       does not check to see if the child has
                                       successfully loaded until it has tried
