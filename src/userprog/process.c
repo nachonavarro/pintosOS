@@ -255,7 +255,8 @@ process_wait (tid_t child_tid)
   struct thread *child = NULL;
   struct list *children = &cur->children;
   struct list_elem *e;
-  for (e = list_begin(children); e != list_end(children); e = list_next(e)) {
+  for (e = list_begin(children); e != list_end(children); e = list_next(e)) 
+  {
     struct thread *t = list_entry(e, struct thread, child_elem);
     if (t->tid == child_tid) {
       child = t;
@@ -443,8 +444,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-//  // ADDED
-//  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

@@ -192,6 +192,7 @@ sys_exit(int status) {
 static pid_t
 sys_exec(const char *cmd_line) {
   check_mem_ptr(cmd_line);
+  lock_acquire(&secure_file);
 
   /* Identity mapping between thread id and process id, because
      Pintos is not multithreaded. */
@@ -209,6 +210,7 @@ sys_exec(const char *cmd_line) {
   struct thread *child = tid_to_thread((tid_t)pid);
   intr_set_level(old_level);
   sema_down(&child->load_sema);
+  lock_release(&secure_file);
   if (!(child->loaded)) {
     return -1;
   }
