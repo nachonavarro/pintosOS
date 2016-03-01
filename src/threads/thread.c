@@ -382,6 +382,7 @@ thread_exit (void)
   struct thread *cur = thread_current();
 #ifdef USERPROG
   sema_up(&cur->exit_sema);
+  sema_down(&cur->before_exit_sema);
 #endif
   cur->status = THREAD_DYING;
   schedule ();
@@ -844,6 +845,8 @@ init_thread (struct thread *t, const char *name, int priority)
      called in thread_exit(). This means the wait system call cannot
      return the exit status until thread has terminated. */
   sema_init(&t->exit_sema, 0);
+  sema_init(&t->before_exit_sema, 0);
+
   /* sema_down() called on load_sema in sys_exec(). sema_up() only
      called in start_process() when thread has successfully loaded.
      This means that the exec system call will wait until the

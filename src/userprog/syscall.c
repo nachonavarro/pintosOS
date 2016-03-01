@@ -36,7 +36,7 @@ static struct file* get_file(int fd);
 static void check_mem_ptr(const void *uaddr);
 static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
-static void check_buffer(void *buffer, unsigned size);
+static void check_buffer(const void *buffer, unsigned size);
 static bool is_executable(const char *file);
 
 void
@@ -375,7 +375,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
       putbuf(buffer, size);
     } else {
       putbuf(buffer, MAX_CONSOLE_WRITE);
-      sys_write(fd, buffer, size - MAX_CONSOLE_WRITE);
+      sys_write(fd, buffer + MAX_CONSOLE_WRITE, size - MAX_CONSOLE_WRITE);
     }
     /* Must have successfully written all bytes we were told to. */
     bytes = size;
@@ -383,7 +383,7 @@ sys_write(int fd, const void *buffer, unsigned size) {
     else 
   {
     struct file *f = get_file(fd);
-    if (!f) {
+    if (f == NULL) {
       lock_release(&secure_file);
       return ERROR;
     }
@@ -404,7 +404,7 @@ sys_seek(int fd, unsigned position) {
 
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
-  if (!f) {
+  if (f == NULL) {
     lock_release(&secure_file);
     return;
   }
@@ -420,7 +420,7 @@ sys_tell(int fd) {
 
   lock_acquire(&secure_file);
   struct file *f = get_file(fd);
-  if (!f) {
+  if (f == NULL) {
     lock_release(&secure_file);
     sys_exit(ERROR);
   }
@@ -500,7 +500,7 @@ check_mem_ptr(const void *uaddr)
 
 /* Checks that all of the buffer that we are writing/reading from is valid. */
 static void
-check_buffer(void *buffer, unsigned size)
+check_buffer(const void *buffer, unsigned size)
 {
 	char *buf = (char *) buffer;
 	unsigned i;

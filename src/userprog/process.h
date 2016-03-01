@@ -13,7 +13,7 @@ void process_activate (void);
 /* Struct holding all information needed to start a process. */
 struct process_info {
   char *filename;
-  int argc;
+  int   argc;
   char *argv[];
 };
 
