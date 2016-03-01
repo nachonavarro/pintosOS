@@ -279,6 +279,7 @@ process_wait (tid_t child_tid)
      thread. */
   child->waited_on = true;
 
+
   /* Wait for child to terminate, then return it's exit status.
      Instead of a busy wait, give each thread a semaphore, initialised
      to 0 on initialising thread, then try to do sema_down here, which
@@ -294,7 +295,9 @@ process_wait (tid_t child_tid)
      still just return exit_status in the case that the process was
      terminated by the kernel. */
   //TODO: Do all kernel terminations incur a page fault???
-  return child->exit_status;
+  int ret = child->exit_status;
+  sema_up(&child->before_exit_sema);
+  return ret;
 
 }
 
