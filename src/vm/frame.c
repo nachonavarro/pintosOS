@@ -1,8 +1,14 @@
+#include <stdbool.h>
 #include "vm/frame.h"
 #include "lib/random.h"
+#include "threads/malloc.h"
+#include "threads/palloc.h"
 
 static struct list frame_table;
 static struct lock frame_table_lock;
+
+static bool add_frame(void *frame, void *upage);
+static void remove_frame(void *frame);
 
 /* Initialise the actual frame table itself, along with any locks required in
    accessing the frame table. */
@@ -10,67 +16,6 @@ void
 frame_table_init(void) {
   list_init(&frame_table);
   lock_acquire(&frame_table_lock);
-}
-
-//TODO: Make static?
-/* Creates a frame that will contain a pointer to the given page, and adds
-   this frame to the frame table. Returns true if frame was successfully
-   added, or false otherwise (i.e. if there was not enough memory to
-   malloc space for a struct frame). Called in alloc_frame(). */
-bool
-add_frame(void *frame, void *upage) {
-  /* Frame is freed in remove_frame(). */
-  struct fte *fte = malloc(sizeof(struct fte));
-
-  /* Return false if struct fte could not be successfully malloc'd. */
-  if (fte == NULL) {
-    return false;
-  }
-
-  /* Set members of struct fte. */
-  fte->frame = frame;
-  fte->upage = upage;
-  fte->owner = (pid_t)thread_current()->tid;
-
-  /* Add the created frame to the frame table. Must acquire a lock while
-     accessing this list, because other threads could try to access this list
-     at the same time. */
-  lock_acquire(&frame_table_lock);
-  list_push_back(&frame_table, &fte->fte_elem);
-  lock_release(&frame_table_lock);
-
-  /* Return true as the frame must have been successfully created to get to
-     this line of code (as false would have been returned otherwise). */
-  return true;
-}
-
-//TODO: Make static?
-/* Removes the frame from the frame table that has the pointer to the
-   supplied page in it. Called in free_frame(). */
-void
-remove_frame(void *frame) {
-  struct list_elem *e;
-  struct fte *fte;
-
-  /* Traverse frame table until we find a frame with a pointer to the
-     supplied page. */
-  lock_acquire(&frame_table_lock);
-  for(e = list_begin(&frame_table);
-      e != list_end(&frame_table);
-      e = list_next(e)) {
-
-    fte = list_entry(e, struct fte, fte_elem);
-
-    if (fte->frame == frame) {
-      list_remove(e);
-      /* Ensure we free the fte, as we malloc'd space for this in
-         add_frame(). */
-      free(fte);
-      break;
-    }
-
-  }
-  lock_release(&frame_table_lock);
 }
 
 //TODO: Change calls to palloc_get_page to alloc_frame (in process.c only??)
@@ -94,11 +39,21 @@ alloc_frame(void *upage) {
      put in the evicted frame). */
   if (frame == NULL) {
     frame = evict(upage);
-    //TODO: PANIC if no frame can  be evicted without allocating a swap slot,
-    //      and swap slot is full (I think evict will return null in this case)
+    /* evict() will return NULL if no frame can be evicted without allocating
+       a swap slot, and swap slot is full. */
+    if (frame == NULL) {
+      PANIC("No frame can be evicted without allocating a swap slot, and swap "
+              "slot is full.\n");
+    }
   } else {
-    add_frame(frame, upage); //Otherwise, add to the frame table
+    /* Otherwise, we can simply add the frame to the frame
+       table (in an fte). */
+    add_frame(frame, upage);
+    //TODO: What do we do if add_frame() can't malloc enough space and
+    //      returns false? Panic?
   }
+
+  /* Return the kernel virtual address of the actual frame in the fte. */
   return frame;
 }
 
@@ -126,10 +81,69 @@ choose_frame_to_evict(void) {
   return fte;
 }
 
-/* Returns frame, like alloc_frame() would have returned. Returns
+/* Evict a frame. Returns a frame (the evicted frame), like alloc_frame() would have returned. Returns
    NULL on failure. */
 void *
-evict(void *upage) {
-  //TODO: Calls choose_frame_to_evict() first?
+evict(void *upage UNUSED) {
+  //TODO: Needs implemeting - Calls choose_frame_to_evict() first?
   return NULL;
+}
+
+/* Creates a frame that will contain a pointer to the given page, and adds
+   this frame to the frame table. Returns true if frame was successfully
+   added, or false otherwise (i.e. if there was not enough memory to
+   malloc space for a struct frame). Called in alloc_frame(). */
+static bool
+add_frame(void *frame, void *upage) {
+  /* Frame is freed in remove_frame(). */
+  struct fte *fte = malloc(sizeof(struct fte));
+
+  /* Return false if struct fte could not be successfully malloc'd. */
+  if (fte == NULL) {
+    return false;
+  }
+
+  /* Set members of struct fte. */
+  fte->frame = frame;
+  fte->upage = upage;
+  fte->owner = (pid_t)thread_current()->tid;
+
+  /* Add the created frame to the frame table. Must acquire a lock while
+     accessing this list, because other threads could try to access this list
+     at the same time. */
+  lock_acquire(&frame_table_lock);
+  list_push_back(&frame_table, &fte->fte_elem);
+  lock_release(&frame_table_lock);
+
+  /* Return true as the frame must have been successfully created to get to
+     this line of code (as false would have been returned otherwise). */
+  return true;
+}
+
+/* Removes the frame from the frame table that has the pointer to the
+   supplied page in it. Called in free_frame(). */
+static void
+remove_frame(void *frame) {
+  struct list_elem *e;
+  struct fte *fte;
+
+  /* Traverse frame table until we find a frame with a pointer to the
+     supplied page. */
+  lock_acquire(&frame_table_lock);
+  for(e = list_begin(&frame_table);
+      e != list_end(&frame_table);
+      e = list_next(e)) {
+
+    fte = list_entry(e, struct fte, fte_elem);
+
+    if (fte->frame == frame) {
+      list_remove(e);
+      /* Ensure we free the fte, as we malloc'd space for this in
+         add_frame(). */
+      free(fte);
+      break;
+    }
+
+  }
+  lock_release(&frame_table_lock);
 }

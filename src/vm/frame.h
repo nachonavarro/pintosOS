@@ -1,8 +1,9 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 
-//TODO: Do we need a paddr and vaddr OR upage and vpage? Is this just frame
-//      and upage?...
+#include "userprog/process.h"
+#include "threads/thread.h"
+
 struct fte {
   void *frame; /* The frame itself, as the frame is 'just a page'. */
   void *upage; /* Pointer to page that currently occupies this frame. */
@@ -17,19 +18,11 @@ struct fte {
                                   struct list frames' in 'frame.c'. */
 };
 
-//TODO: Put functions in header - not static ones.
-/*
-  bool add_frame(void *frame, void *uaddr); //Add frame to table
-  void remove_frame(void *frame); //Remove frame from table (and call
-                                  //palloc_free_page()?? OR put this in
-                                  //separate free_frame function?? Or just
-                                  //call palloc_free_page where we need it??)
-  struct frame get_frame(void *frame); //Retrieve frame table entry that points to given page
-  void *frame_alloc(enum palloc_flags flags, void *uaddr); //Attempt to allocate a frame
-                                                           //Returns frame allocated using
-                                                           //palloc_get_page().
-  void *evict(void *uaddr); //Evict a frame.
- */
+void frame_table_init(void);
+void *alloc_frame(void *upage);
+void free_frame(void *frame);
+struct fte *choose_frame_to_evict(void);
+void *evict(void *upage);
 
 #endif /* vm/frame.h */
 
