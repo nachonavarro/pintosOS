@@ -137,13 +137,26 @@ page_fault (struct intr_frame *f)
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
 
-
-  /* Exit status set to -1 when exception causes process to exit. */
-  thread_current()->exit_status = ERROR;
-
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
   intr_enable ();
+
+
+
+  // TODO: Change page fault handling
+
+  // 1. Locate page that faulted in SPT
+
+  // 2. Obtain frame to store the page
+
+  // 3. Fetch the data into the frame
+
+  // 4. Point page table entry for the faulting virtual address to the frame
+
+
+
+  /* Exit status set to -1 when exception causes process to exit. */
+  thread_current()->exit_status = ERROR;
 
   /* Count page faults. */
   page_fault_cnt++;
