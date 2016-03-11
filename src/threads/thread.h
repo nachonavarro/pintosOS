@@ -7,6 +7,7 @@
 #include <threads/synch.h>
 #include "fixed-point.h"
 #include "filesys/directory.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -20,6 +21,7 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
@@ -164,6 +166,8 @@ struct thread
                                   will be set to the filename of this
                                   executable. */
 #endif
+
+    struct spt supplemental_page_table;
 
     int exit_status;
     struct list files;            /* List of files that a thread has open (Same
