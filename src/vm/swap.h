@@ -11,5 +11,6 @@
 
 void swap_out(void *, size_t);
 void swap_int(void *);
+void free_slot(size_t);
 
 #endif /* vm/swap.h */
