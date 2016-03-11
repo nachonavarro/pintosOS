@@ -9,7 +9,7 @@
 #define NUM_OF_SLOTS_TO_SWAP 1
 
 
-void swap_out(void *);
+void swap_out(void *, size_t);
 void swap_int(void *);
 
 #endif /* vm/swap.h */

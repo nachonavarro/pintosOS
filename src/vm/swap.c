@@ -26,18 +26,18 @@ swap_in(void *page_start)
             block_write(swap_space, SECTORS_PER_PAGE * free_slot_index + i,
                                                             page_start + i);
         }
+
+    int i = 0;
+
 }
 
+
+//TODO: Billy, the frame table will need to supply the slot it needs from disk.
 void
-swap_out(void *page_start)
+swap_out(void *page_start, size_t swap_slot)
 {
 
-    // TODO: I still need to figure out how to access the right slot in the bitmap.
-    // For swapping in it isn't a problem, as we can find any free slot.
-    // For swapping out though, the slot is fixed to the slot corresponding to the page.
-    int free_slot_index =
-                bitmap_scan_and_flip(swap_bitmap, BITMAP_START_INDEX,
-                                        NUM_OF_SLOTS_TO_SWAP, true);
+    int free_slot_index = bitmap_flip(swap_bitmap, swap_slot);
     int i;
     for (i = 0; i < SECTORS_PER_PAGE; i++)
         {
