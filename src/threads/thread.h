@@ -167,8 +167,6 @@ struct thread
                                   executable. */
 #endif
 
-    struct spt supplemental_page_table;
-
     int exit_status;
     struct list files;            /* List of files that a thread has open (Same
                                      file can be open with different fd). */
@@ -176,6 +174,9 @@ struct thread
                                      process/thread will take this as its'
                                      file descriptor. Incremented after a
                                      file is opened. */
+
+    struct hash supplemental_page_table; /* Hash map of virtual addresses to 
+                                            additional information */
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };
