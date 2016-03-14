@@ -18,7 +18,6 @@ struct lock secure_file;
 
 static void syscall_handler (struct intr_frame *);
 static void sys_halt(void);
-void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);

@@ -1,9 +1,13 @@
 #include "vm/page.h"
 
+static unsigned generate_hash(const struct hash_elem *e, void *aux);
+static bool compare_less_hash(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+
+
 void
 spt_init (struct hash *spt)
 {
-  hash_init(spt, generate_hash, compare_less_hash, aux);
+  hash_init(spt, generate_hash, compare_less_hash, 0);
 }
 
 static unsigned 
@@ -27,37 +31,49 @@ compare_less_hash (const struct hash_elem *a,
   return vaddr_a <= vaddr_b;
 }
 
-struct spt
+
+struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
-	struct spt_entry *entry;
-	entry->vaddr = address;
-	struct hash_elem *hash_elem = hash_find(table, entry->elem);
-	return hash_entry(hash_elem, struct spt_entry, elem);
+  void *new_page = palloc_get_page(0);
+	struct spt_entry *entry = new_page;
 
+	entry->vaddr = (uint32_t) address;
+	struct hash_elem *hash_elem = hash_find(table, &entry->elem);
+
+  palloc_free_page(new_page);
+
+  if (hash_elem == NULL)
+    return NULL;
+
+	return hash_entry(hash_elem, struct spt_entry, elem);
 }
 
 // TODO: Implement supplemental page table methods
-void
-load_from_disk(struct spt_entry *spt_entry)
-{
-	struct thread *cur = thread_current();
-	void *page = alloc_frame(spt_entry->vaddr);
-	swap_out(spt_entry->vaddr, spt_entry->swap_slot);
-	hash_delete (cur->supp_pt, &spt_entry->elem);
-}
 
-void
-load_file(struct spt *entry)
-{
 
-}
+// Define following methods in exception.c rather than in page.c?
 
-void
-load_mmf(struct spt *entry)
-{
+// void
+// load_from_disk(struct spt_entry *spt_entry)
+// {
+// 	struct thread *cur = thread_current();
+// 	void *page = allocate_frame(spt_entry->vaddr);
+// 	swap_out(spt_entry->vaddr, spt_entry->swap_slot);
+// 	hash_delete (cur->supp_pt, &spt_entry->elem);
+// }
 
-}
+// void
+// load_file(struct spt_entry *entry)
+// {
+
+// }
+
+// void
+// load_mmf(struct spt_entry *entry)
+// {
+
+// }
 
 
 

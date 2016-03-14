@@ -2,6 +2,7 @@
 #define VM_PAGE_H
 
 #include "lib/kernel/hash.h"
+#include "threads/palloc.h"
 
 struct spt_entry {
     size_t swap_slot;
@@ -13,13 +14,18 @@ struct spt_entry {
     struct hash_elem elem;
 };
 
-void spt_init(void);
-uint32_t spt_lookup(uint32_t fault_address);
-void spt_insert(void);
-struct spt get_spt_entry(struct hash *table, void *address);
-void load_from_disk(struct spt *entry);
-void load_file(struct spt *entry);
-void load_mmf(struct spt *entry);
+void spt_init(struct hash *spt);
+void spt_insert(struct hash *spt, struct spt_entry *entry);
+struct spt_entry* get_spt_entry(struct hash *table, void *address);
+
+
+// Define following methods in exception.c rather than in page.c?
+
+// void load_from_disk(struct spt_entry *entry);
+// void load_file(struct spt_entry *entry);
+// void load_mmf(struct spt_entry *entry);
+
+
 // void spt_remove(void);
 // Is removal needed?
 

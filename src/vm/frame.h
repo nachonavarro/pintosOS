@@ -4,6 +4,7 @@
 #include "userprog/process.h"
 #include "threads/thread.h"
 
+
 struct fte {
   void *frame; /* The frame itself, as the frame is 'just a page'. */
   void *upage; /* Pointer to page that currently occupies this frame. */
@@ -19,7 +20,7 @@ struct fte {
 };
 
 void frame_table_init(void);
-void *alloc_frame(void *upage);
+void *allocate_frame(void *upage);
 void free_frame(void *frame);
 struct fte *choose_frame_to_evict(void);
 void *evict(void *upage);

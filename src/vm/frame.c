@@ -18,7 +18,7 @@ frame_table_init(void) {
   lock_init(&frame_table_lock);
 }
 
-//TODO: Change calls to palloc_get_page to alloc_frame (in process.c only??)
+//TODO: Change calls to palloc_get_page to allocate_frame (in process.c only??)
 //      where it will be set to a new member in the struct fte?
 //      I think we do, but not sure why we need this upage...
 //      (This upage may just be the pointer to the user page, if any, that
@@ -29,7 +29,7 @@ frame_table_init(void) {
    palloc_get_page(), or the return value of evict(). Panics if no frame
    can evicted without allocating a swap slot, and swap slot is full. */
 void *
-alloc_frame(void *upage) {
+allocate_frame(void *upage) {
   /* A frame is just a page sized region of physical memory, accessed through
      kernel virtual memory (returned from palloc_get_page()) */
   void *frame = palloc_get_page(PAL_USER);
@@ -59,7 +59,7 @@ alloc_frame(void *upage) {
 
 /* Remove frame for this page from frame table, and then free the page
    itself. Called instead of palloc_free_page() (in process.c only??).
-   Argument is return value of alloc_frame(). */
+   Argument is return value of allocate_frame(). */
 void
 free_frame(void *frame) {
   remove_frame(frame);
@@ -81,7 +81,7 @@ choose_frame_to_evict(void) {
   return fte;
 }
 
-/* Evict a frame. Returns a frame (the evicted frame), like alloc_frame() would have returned. Returns
+/* Evict a frame. Returns a frame (the evicted frame), like allocate_frame() would have returned. Returns
    NULL on failure. */
 void *
 evict(void *upage UNUSED) {
@@ -92,7 +92,7 @@ evict(void *upage UNUSED) {
 /* Creates a frame that will contain a pointer to the given page, and adds
    this frame to the frame table. Returns true if frame was successfully
    added, or false otherwise (i.e. if there was not enough memory to
-   malloc space for a struct frame). Called in alloc_frame(). */
+   malloc space for a struct frame). Called in allocate_frame(). */
 static bool
 add_frame(void *frame, void *upage) {
   /* Frame is freed in remove_frame(). */

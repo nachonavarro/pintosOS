@@ -1,10 +1,6 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
-#include "userprog/gdt.h"
-#include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "userprog/syscall.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -169,15 +165,21 @@ page_fault (struct intr_frame *f)
   }
 	
 	struct thread *cur = thread_current();
-	struct spt *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
 
-	if (entry->swap) {
-		load_from_disk(entry);
-	} else if (entry->file) {
-		load_file(entry);
-	} else if (entry->mmf) {
-		load_mmf(entry);
-	}
+
+  // pg_round_down is static... can we find another way?
+
+	// struct spt_entry *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
+
+  // load_from_disk, load_file and load_mmf should maybe be implemented in exception.c
+
+	// if (entry->swap) {
+	// 	load_from_disk(entry);
+	// } else if (entry->file) {
+	// 	load_file(entry);
+	// } else if (entry->mmf) {
+	// 	load_mmf(entry);
+	// }
 
 
   /* To implement virtual memory, delete the rest of the function

@@ -858,7 +858,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   list_init(&t->files);
-  spt_init(&t->supplemental_page_table);
+  spt_init(&t->supp_pt);
 
   /* First file descriptor for a process' open file is 2, as 0 and 1 are
      reserved for input and output, respectively. */

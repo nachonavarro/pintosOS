@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -191,7 +192,8 @@ push_arguments_on_stack(struct process_info *p, void **esp)
   uint32_t bottom_of_stack = top_of_stack - PGSIZE;
 
   /* Pushing arguments to the stack in reverse order */
-  for (int j = p->argc; j > 0; j--) {
+  for (int j = p->argc; j > 0; j--) 
+  {
     if (!put_string_in_stack(esp, p->argv[j-1], bottom_of_stack))
       return false;
     p->argv[j-1] = *esp;
@@ -208,7 +210,8 @@ push_arguments_on_stack(struct process_info *p, void **esp)
     return false;
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = p->argc; k > 0; k--) {
+  for (int k = p->argc; k > 0; k--) 
+  {
     if (!put_uint_in_stack(esp, (uint32_t) p->argv[k-1], bottom_of_stack))
       return false;
   }
