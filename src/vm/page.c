@@ -1,4 +1,7 @@
 #include "vm/page.h"
+#include "threads/palloc.h"
+#include "threads/thread.h"
+#include "vm/frame.h"
 
 static unsigned generate_hash(const struct hash_elem *e, void *aux);
 static bool compare_less_hash(const struct hash_elem *a, const struct hash_elem *b, void *aux);
@@ -49,31 +52,30 @@ get_spt_entry(struct hash *table, void *address)
 	return hash_entry(hash_elem, struct spt_entry, elem);
 }
 
-// TODO: Implement supplemental page table methods
+// TODO: Implement Insertion/Modification
 
 
-// Define following methods in exception.c rather than in page.c?
 
-// void
-// load_from_disk(struct spt_entry *spt_entry)
-// {
-// 	struct thread *cur = thread_current();
-// 	void *page = allocate_frame(spt_entry->vaddr);
-// 	swap_out(spt_entry->vaddr, spt_entry->swap_slot);
-// 	hash_delete (cur->supp_pt, &spt_entry->elem);
-// }
+void
+load_from_disk(struct spt_entry *spt_entry)
+{
+	struct thread *cur = thread_current();
+	void *page = allocate_frame(spt_entry->vaddr);
+	swap_out(spt_entry->vaddr, spt_entry->swap_slot);
+	hash_delete (&cur->supp_pt, &spt_entry->elem);
+}
 
-// void
-// load_file(struct spt_entry *entry)
-// {
+void
+load_file(struct spt_entry *entry)
+{
 
-// }
+}
 
-// void
-// load_mmf(struct spt_entry *entry)
-// {
+void
+load_mmf(struct spt_entry *entry)
+{
 
-// }
+}
 
 
 
