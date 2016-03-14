@@ -170,7 +170,14 @@ page_fault (struct intr_frame *f)
 	
 	struct thread *cur = thread_current();
 	struct spt *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
-	load_from_disk(entry);
+
+	if (entry->swap) {
+		load_from_disk(entry);
+	} else if (entry->file) {
+		load_file(entry);
+	} else if (entry->mmf) {
+		load_mmf(entry);
+	}
 
 
   /* To implement virtual memory, delete the rest of the function

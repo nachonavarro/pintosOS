@@ -44,5 +44,20 @@ load_from_disk(struct spt *spt_entry)
 	struct thread *cur = thread_current();
 	void *page = alloc_frame(spt_entry->vaddr);
 	swap_out(spt_entry->vaddr, spt_entry->swap_slot);
+	hash_delete (cur->supp_pt, &spt_entry->elem);
 }
+
+void
+load_file(struct spt *entry)
+{
+
+}
+
+void
+load_mmf(struct spt *entry)
+{
+
+}
+
+
 
