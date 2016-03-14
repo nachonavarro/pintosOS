@@ -153,8 +153,6 @@ page_fault (struct intr_frame *f)
 
   // 4. Point page table entry for the faulting virtual address to the frame
 
-
-
   /* Exit status set to -1 when exception causes process to exit. */
   thread_current()->exit_status = ERROR;
 
@@ -169,6 +167,11 @@ page_fault (struct intr_frame *f)
   if (user) {
 	  sys_exit(ERROR);
   }
+	
+	struct thread *cur = thread_current();
+	struct spt *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
+	load_from_disk(entry);
+
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

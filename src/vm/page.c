@@ -27,5 +27,22 @@ compare_less_hash (const struct hash_elem *a,
   return vaddr_a <= vaddr_b;
 }
 
+struct spt
+get_spt_entry(struct hash *table, void *address)
+{
+	struct spt *entry;
+	entry->vaddr = address;
+	struct hash_elem *hash_elem = hash_find(table, entry->elem);
+	return hash_entry(hash_elem, struct spt, elem);
+
+}
+
 // TODO: Implement supplemental page table methods
+void
+load_from_disk(struct spt *spt_entry)
+{
+	struct thread *cur = thread_current();
+	void *page = alloc_frame(spt_entry->vaddr);
+	swap_out(spt_entry->vaddr, spt_entry->swap_slot);
+}
 
