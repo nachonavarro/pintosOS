@@ -3,7 +3,7 @@
 
 #include "lib/kernel/hash.h"
 
-struct spt {
+struct spt_entry {
     size_t swap_slot;
 	uint32_t vaddr;
     uint32_t starting_address;
@@ -11,7 +11,6 @@ struct spt {
     bool file;
     bool mmf;
     struct hash_elem elem;
-
 };
 
 void spt_init(void);
