@@ -3,8 +3,12 @@
 
 #include "userprog/process.h"
 #include "threads/thread.h"
+#include "threads/palloc.h"
 
 struct fte {
+  /* frame and upage are such that install_page(upage, kpage, _) will be
+     called after frame_alloc() is called (kpage is returned from frame_alloc()
+     and upage is passed as an argument, but both are stored in the fte). */
   void *frame; /* The frame itself, as the frame is 'just a page'. */
   void *upage; /* Pointer to page that currently occupies this frame. */
 
@@ -19,8 +23,8 @@ struct fte {
 };
 
 void frame_table_init(void);
-void *alloc_frame(void *upage);
-void free_frame(void *frame);
+void *frame_alloc(enum palloc_flags flags, void *upage);
+void frame_free(void *frame);
 struct fte *choose_frame_to_evict(void);
 void *evict(void *upage);
 
