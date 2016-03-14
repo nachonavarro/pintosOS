@@ -15,7 +15,7 @@ static void remove_frame(void *frame);
 void
 frame_table_init(void) {
   list_init(&frame_table);
-  lock_acquire(&frame_table_lock);
+  lock_init(&frame_table_lock);
 }
 
 //TODO: Change calls to palloc_get_page to alloc_frame (in process.c only??)
