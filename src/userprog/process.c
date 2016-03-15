@@ -193,8 +193,7 @@ push_arguments_on_stack(struct process_info *p, void **esp)
   uint32_t bottom_of_stack = top_of_stack - PGSIZE;
 
   /* Pushing arguments to the stack in reverse order */
-  for (int j = p->argc; j > 0; j--) 
-  {
+  for (int j = p->argc; j > 0; j--) {
     if (!put_string_in_stack(esp, p->argv[j-1], bottom_of_stack))
       return false;
     p->argv[j-1] = *esp;
@@ -211,8 +210,7 @@ push_arguments_on_stack(struct process_info *p, void **esp)
     return false;
 
   /* Pushing pointers to the arguments in reverse order */
-  for (int k = p->argc; k > 0; k--) 
-  {
+  for (int k = p->argc; k > 0; k--) {
     if (!put_uint_in_stack(esp, (uint32_t) p->argv[k-1], bottom_of_stack))
       return false;
   }
@@ -634,14 +632,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = allocate_frame(upage);
+      uint8_t *kpage = frame_alloc(PAL_USER, upage);
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          free_frame(kpage);
+          frame_free(kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -649,7 +647,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          free_frame(kpage);
+          frame_free(kpage);
           return false; 
         }
 
@@ -669,16 +667,18 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+
+  kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = install_page (upage, kpage, true);
       if (success) 
       {
         *esp = PHYS_BASE;
       }
       else
-        palloc_free_page (kpage);
+        frame_free(kpage);
     }
   return success;
 }

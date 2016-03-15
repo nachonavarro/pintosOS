@@ -18,21 +18,20 @@ frame_table_init(void) {
   lock_init(&frame_table_lock);
 }
 
-//TODO: Change calls to palloc_get_page to allocate_frame (in process.c only??)
-//      where it will be set to a new member in the struct fte?
-//      I think we do, but not sure why we need this upage...
-//      (This upage may just be the pointer to the user page, if any, that
-//      occupies it)
-/* Called instead of palloc_get_page(). Gets a page and then adds a frame to
-   the frame table that points to that page. Calls a function to handle
-   eviction if the frame table is full. Returns the page returned from
-   palloc_get_page(), or the return value of evict(). Panics if no frame
-   can evicted without allocating a swap slot, and swap slot is full. */
+/* Called instead of palloc_get_page() when allocating a user page.
+   Gets a page and then adds a frame to the frame table that points to
+   that page. Calls a function to handle eviction if the frame table is full.
+   Returns the page returned from palloc_get_page(), or the return value of
+   evict(). Panics if no frame can evicted without allocating a swap slot, and
+   swap slot is full. */
 void *
-allocate_frame(void *upage) {
+frame_alloc(enum palloc_flags flags, void *upage) {
+    /* frame_alloc() must only be called when allocating a user page. */
+    ASSERT((flags & PAL_USER) != 0);
+
   /* A frame is just a page sized region of physical memory, accessed through
      kernel virtual memory (returned from palloc_get_page()) */
-  void *frame = palloc_get_page(PAL_USER);
+  void *frame = palloc_get_page(flags);
 
   /* If frame table is full, we need to evict a frame, and return the evicted
      frame (where old contents have been evicted and new contents have been
@@ -59,9 +58,9 @@ allocate_frame(void *upage) {
 
 /* Remove frame for this page from frame table, and then free the page
    itself. Called instead of palloc_free_page() (in process.c only??).
-   Argument is return value of allocate_frame(). */
+   Argument is return value of frame_alloc(). */
 void
-free_frame(void *frame) {
+frame_free(void *frame) {
   remove_frame(frame);
   palloc_free_page(frame);
 }
@@ -81,7 +80,7 @@ choose_frame_to_evict(void) {
   return fte;
 }
 
-/* Evict a frame. Returns a frame (the evicted frame), like allocate_frame() would have returned. Returns
+/* Evict a frame. Returns a frame (the evicted frame), like frame_alloc() would have returned. Returns
    NULL on failure. */
 void *
 evict(void *upage UNUSED) {
@@ -92,7 +91,7 @@ evict(void *upage UNUSED) {
 /* Creates a frame that will contain a pointer to the given page, and adds
    this frame to the frame table. Returns true if frame was successfully
    added, or false otherwise (i.e. if there was not enough memory to
-   malloc space for a struct frame). Called in allocate_frame(). */
+   malloc space for a struct frame). Called in frame_alloc(). */
 static bool
 add_frame(void *frame, void *upage) {
   /* Frame is freed in remove_frame(). */
@@ -121,7 +120,7 @@ add_frame(void *frame, void *upage) {
 }
 
 /* Removes the frame from the frame table that has the pointer to the
-   supplied page in it. Called in free_frame(). */
+   supplied page in it. Called in frame_free(). */
 static void
 remove_frame(void *frame) {
   struct list_elem *e;
