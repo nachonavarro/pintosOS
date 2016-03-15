@@ -5,7 +5,7 @@
 
 struct spt_entry {
     size_t swap_slot;
-	uint32_t vaddr;
+	void  *vaddr;
     uint32_t starting_address;
     bool swap;
     bool file;

@@ -243,6 +243,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  spt_init(&t->supp_pt);
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
@@ -858,7 +859,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   list_init(&t->files);
-  spt_init(&t->supp_pt);
 
   /* First file descriptor for a process' open file is 2, as 0 and 1 are
      reserved for input and output, respectively. */
