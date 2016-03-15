@@ -35,11 +35,24 @@ compare_less_hash (const struct hash_elem *a,
   return vaddr_a <= vaddr_b;
 }
 
+void
+spt_insert(struct hash *spt, struct spt_entry *entry)
+{
+  struct hash_elem *elem;
+  elem = hash_insert(spt, &entry->elem);
+
+  if (elem != NULL)
+    hash_replace(spt, &entry->elem);
+}
+
 
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
-    void *new_page = palloc_get_page(0);
+
+  // TODO: Replace palloc_get_page with frame_alloc?
+  
+  void *new_page = palloc_get_page(0);
 	struct spt_entry *entry = new_page;
 
 	entry->vaddr = address;
