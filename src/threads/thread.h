@@ -175,7 +175,7 @@ struct thread
                                      file descriptor. Incremented after a
                                      file is opened. */
 
-    struct hash supp_pt; /* Hash map of virtual addresses to
+    struct hash supp_pt;          /* Hash map of virtual addresses to
                                             additional information */
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */

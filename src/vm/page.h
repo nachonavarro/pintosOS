@@ -16,14 +16,12 @@ struct spt_entry {
 void spt_init(struct hash *spt);
 void spt_insert(struct hash *spt, struct spt_entry *entry);
 struct spt_entry* get_spt_entry(struct hash *table, void *address);
+void spt_destroy(struct hash *hashmap);
 
 void load_from_disk(struct spt_entry *entry);
 void load_file(struct spt_entry *entry);
 void load_mmf(struct spt_entry *entry);
 
-
-// void spt_remove(void);
-// Is removal needed?
 
 // void spt_modify(struct hash *spt, struct spt_entry *entry)
 // do we need this? or when we insert an already existing spt_elem, it modifies it to its new value?
