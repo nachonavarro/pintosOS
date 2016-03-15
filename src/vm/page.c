@@ -27,10 +27,10 @@ compare_less_hash (const struct hash_elem *a,
                    void *aux UNUSED)
 {
   struct spt_entry *supp_page_table_a = hash_entry(a, struct spt_entry, elem);
-  uint32_t vaddr_a = supp_page_table_a->vaddr;
+  uint32_t vaddr_a = (uint32_t) supp_page_table_a->vaddr;
 
   struct spt_entry *supp_page_table_b = hash_entry(b, struct spt_entry, elem);
-  uint32_t vaddr_b = supp_page_table_b->vaddr;
+  uint32_t vaddr_b = (uint32_t) supp_page_table_b->vaddr;
 
   return vaddr_a <= vaddr_b;
 }
@@ -42,7 +42,7 @@ get_spt_entry(struct hash *table, void *address)
     void *new_page = palloc_get_page(0);
 	struct spt_entry *entry = new_page;
 
-	entry->vaddr = (uint32_t) address;
+	entry->vaddr = address;
 	struct hash_elem *hash_elem = hash_find(table, &entry->elem);
 
 	palloc_free_page(new_page);
@@ -60,7 +60,7 @@ void
 load_from_disk(struct spt_entry *spt_entry)
 {
 	struct thread *cur = thread_current();
-	void *page = allocate_frame(spt_entry->vaddr);
+	void *page = frame_alloc(PAL_USER, spt_entry->vaddr);
 	swap_out(page, spt_entry->swap_slot);
 	hash_delete (&cur->supp_pt, &spt_entry->elem);
 }
