@@ -30,6 +30,8 @@ static int sys_write(int fd, const void *buffer, unsigned size);
 static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 static void sys_close(int fd);
+static void sys_mmap(int fd, void *addr);
+static void sys_munmap(int fd);
 
 /* Helper functions for system calls. */
 static struct file* get_file(int fd);
@@ -153,6 +155,19 @@ syscall_handler (struct intr_frame *f)
       int fd        = (int)get_word_on_stack(f, 1);
       sys_close(fd);
       break;
+    }
+    case SYS_MMAP:
+    {
+        int fd     = (int)get_word_on_stack(f, 1);
+        void *addr = (void *)get_word_on_stack(f, 2);
+        f->eax = sys_mmap(fd, addr);
+        break;
+    }
+    case SYS_MUNMAP:
+    {
+        mapid_t mapping = (mapid_t)get_word_on_stack(f, 1);
+        sys_munmap(mapping);
+        break;
     }
     default:
     {
@@ -488,9 +503,22 @@ sys_close(int fd)
   lock_release(&secure_file);
 }
 
+static void
+sys_mmap(int fd, void *addr)
+{
+
+}
+
+static void
+sys_munmap(int fd)
+{
+
+}
+
 /* Returns the file corresponding the to supplied file descriptor
    in the current thread's list of files that it can see. */
-static struct file* get_file(int fd) 
+static struct file*
+get_file(int fd)
 {
   struct thread *cur = thread_current();
   struct list_elem *e;
