@@ -10,7 +10,7 @@ static unsigned generate_hash(const struct hash_elem *e, void *aux UNUSED);
 static bool compare_less_hash(const struct hash_elem *a, const struct hash_elem *b, void *aux);
 static void hash_free_elem(struct hash_elem *e, void *aux);
 
-
+/* Initialises the supplemental page table and the spt_lock */
 void
 spt_init (struct hash *spt)
 {
@@ -18,6 +18,7 @@ spt_init (struct hash *spt)
   lock_init(&spt_lock);
 }
 
+/* Function which generates a hashkey, given a hash_elem */
 static unsigned 
 generate_hash (const struct hash_elem *e, void *aux UNUSED)
 {
@@ -25,6 +26,7 @@ generate_hash (const struct hash_elem *e, void *aux UNUSED)
   return (unsigned) supp_page_table->vaddr;
 }
 
+/* Function which compares 2 hash_elems by comparing their hashkey */
 static bool
 compare_less_hash (const struct hash_elem *a, 
                    const struct hash_elem *b, 
@@ -39,6 +41,8 @@ compare_less_hash (const struct hash_elem *a,
   return vaddr_a <= vaddr_b;
 }
 
+/* Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
+   If the entry already exists, replaces it with its new value. */
 void
 spt_insert(struct hash *spt, struct spt_entry *entry)
 {
@@ -53,7 +57,7 @@ spt_insert(struct hash *spt, struct spt_entry *entry)
     lock_release(&spt_lock);
 }
 
-
+/* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
@@ -102,6 +106,7 @@ load_mmf(struct spt_entry *entry)
     return;
 }
 
+/* Frees each spt_entry of the hashmap and destroys it. */
 void 
 spt_destroy (struct hash *hashmap)
 {
@@ -110,6 +115,7 @@ spt_destroy (struct hash *hashmap)
   lock_release(&spt_lock);
 }
 
+/* Frees an spt_entry, used in spt_destroy. */
 static void 
 hash_free_elem (struct hash_elem *e, void *aux)
 {

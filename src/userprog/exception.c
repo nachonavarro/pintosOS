@@ -143,7 +143,29 @@ page_fault (struct intr_frame *f)
 
   // 1. Locate page that faulted in SPT
 
+
+  struct thread *cur = thread_current();
+
+  // pg_round_down is static... can we find another way?
+
+  // struct spt_entry *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
+  struct spt_entry *entry = get_spt_entry(&cur->supp_pt, fault_addr);
+
+
+  if (entry->swap) {
+    load_from_disk(entry);
+  } else if (entry->file) {
+    load_file(entry);
+  } else if (entry->mmf) {
+    load_mmf(entry);
+  }
+
+
   // 2. Obtain frame to store the page
+
+
+  // void *new_frame = frame_alloc(PAL_USER, upage);
+
 
   // 3. Fetch the data into the frame
 
@@ -163,22 +185,6 @@ page_fault (struct intr_frame *f)
   if (user) {
 	  sys_exit(ERROR);
   }
-	
-	struct thread *cur = thread_current();
-
-
-  // pg_round_down is static... can we find another way?
-
-	// struct spt_entry *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
-  struct spt_entry *entry = get_spt_entry(&cur->supp_pt, fault_addr);
-
-	if (entry->swap) {
-		load_from_disk(entry);
-	} else if (entry->file) {
-		load_file(entry);
-	} else if (entry->mmf) {
-		load_mmf(entry);
-	}
 
 
   /* To implement virtual memory, delete the rest of the function
