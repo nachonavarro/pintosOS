@@ -502,11 +502,50 @@ sys_close(int fd)
   lock_release(&secure_file);
 }
 
-/* Maps the file open as FD into the process' virtual address space - entire file mapped into consecutive virtual pages starting at ADDR.  */
+/* Maps the file open as FD into the process' virtual address space - entire
+   file mapped into consecutive virtual pages starting at ADDR. (Lazy load
+   pages in mmap regions). (Evicting a page mapped by mmap writes it back to
+   the actual file it was mapped from). (Set spare bytes on final page to zero
+   when that page is faulted in the file system, and ignore these bytes when
+   page is written back to disk). Returns mapid_t for the mapping, or -1 on
+   failure. Failure occurs when file has length 0, if addr is not page aligned,
+   if range of pages mapped overlaps any existing mapped pages (including the
+   stack or pages mapped at executable load time), if addr is 0, or if fd
+   is 0 or 1. */
 static mapid_t
 sys_mmap(int fd, void *addr)
 {
-  return 0;
+  /* Check that fd is a valid file descriptor. */
+  check_fd(fd);
+
+  /* Cannot map stdin or stdout. */
+  if (fd == STDIN_FILENO || fd == STDOUT_FILENO) {
+    return ERROR;
+  }
+
+  /* Address to map to cannot be 0, because some Pintos code assumes virtual
+     page 0 is not mapped. */
+  if (addr == 0) {
+    return ERROR;
+  }
+
+  int size = sys_filesize(fd);
+
+  /* Cannot map a file of size 0 bytes. */
+  if (size == 0) {
+    return ERROR;
+  }
+
+  /* ADDR must be page-aligned. */
+  if (pg_ofs(addr) != 0) {
+    return ERROR;
+  }
+
+  //TODO: Still need to 'return ERROR' if range of pages mapped overlaps any
+  //      existing mapped pages.
+
+
+
 }
 
 static void

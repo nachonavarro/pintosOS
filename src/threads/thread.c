@@ -385,8 +385,11 @@ thread_exit (void)
   list_remove (&thread_current()->allelem);
   struct thread *cur = thread_current();
 #ifdef VM
+  /* Frees resources of all entries in the mmap_table, as well as freeing the
+     memory allocated for the table itself. */
   destroy_mmap_table(cur->mmap_table);
 #endif
+
 #ifdef USERPROG
   sema_up(&cur->exit_sema);
   sema_down(&cur->before_exit_sema);
