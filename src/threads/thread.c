@@ -384,6 +384,9 @@ thread_exit (void)
 
   list_remove (&thread_current()->allelem);
   struct thread *cur = thread_current();
+#ifdef VM
+  destroy_mmap_table(cur->mmap_table);
+#endif
 #ifdef USERPROG
   sema_up(&cur->exit_sema);
   sema_down(&cur->before_exit_sema);
@@ -834,6 +837,13 @@ init_thread (struct thread *t, const char *name, int priority)
   if (strcmp(name, "main") != 0) {
     list_push_front(&thread_current()->children, &t->child_elem);
   }
+#endif
+
+#ifdef VM
+  /* Memory mapping initialisation. */
+  hash_init(&t->mmap_table, mapid_hash, mapid_less, NULL);
+  lock_init(&t->mmap_table_lock);
+  t->next_mapid = (mapid_t) 0;
 #endif
 
   if(!thread_mlfqs) {

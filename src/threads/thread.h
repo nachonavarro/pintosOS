@@ -175,12 +175,15 @@ struct thread
                                      file is opened. */
 
 #ifdef VM
-    //TODO: This may be better off somewhere else (where mapid is set for the
-    //      struct (syscall.c)? - if so, would need to make sure to reset to 0
-    //      when we flush mmap_table/process exits (so maybe in mmap.c?))
-    int next_mapid; /* Next mmap mapping for this thread will take this as its
-                       mapid. Incremented after a new mapping is added.
-                       Initially set to 0. */
+    /* Memory mapping members. */
+    struct hash mmap_table; /* Mapping between mapid_t and struct mmap_mapping. */
+    struct lock mmap_table_lock; /* Acquired/released before/after calling
+                                    hash_insert()/hash_delete() on this
+                                    threads mmap_table. */
+    //TODO: Increment in mmap.c or syscall.c? (Doesn't really matter, I think mmap.c would be better..)
+    mapid_t next_mapid; /* Next mmap mapping for this thread will take this as its
+                           mapid. Incremented after a new mapping is added.
+                           Initially set to 0. */
 #endif
 
     /* Owned by thread.c. */
