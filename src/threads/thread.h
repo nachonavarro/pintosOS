@@ -7,6 +7,7 @@
 #include <threads/synch.h>
 #include "fixed-point.h"
 #include "filesys/directory.h"
+#include "vm/mmap.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -172,6 +173,16 @@ struct thread
                                      process/thread will take this as its'
                                      file descriptor. Incremented after a
                                      file is opened. */
+
+#ifdef VM
+    //TODO: This may be better off somewhere else (where mapid is set for the
+    //      struct (syscall.c)? - if so, would need to make sure to reset to 0
+    //      when we flush mmap_table/process exits (so maybe in mmap.c?))
+    int next_mapid; /* Next mmap mapping for this thread will take this as its
+                       mapid. Incremented after a new mapping is added.
+                       Initially set to 0. */
+#endif
+
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };

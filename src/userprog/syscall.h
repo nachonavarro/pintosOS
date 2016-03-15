@@ -4,6 +4,13 @@
 #include <list.h>
 #include "filesys/file.h"
 
+/* Process identifier. */
+typedef int pid_t;
+#define PID_ERROR ((pid_t) -1)
+
+/* Map region identifier. */
+typedef int mapid_t;
+
 /* Maximum number of bytes allowed to be written to the console with a
    single putbuf() */
 #define MAX_CONSOLE_WRITE 300
@@ -20,5 +27,6 @@ struct proc_file {
 };
 
 void syscall_init (void);
+void sys_exit (int status);
 
 #endif /* userprog/syscall.h */

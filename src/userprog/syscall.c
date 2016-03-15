@@ -11,7 +11,6 @@
 #include "devices/input.h"
 #include "threads/malloc.h"
 #include "lib/string.h"
-#include "lib/user/syscall.h"
 
 /* Ensures multiple threads cannot call file system code at the same time. */
 struct lock secure_file;
@@ -30,8 +29,8 @@ static int sys_write(int fd, const void *buffer, unsigned size);
 static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 static void sys_close(int fd);
-static void sys_mmap(int fd, void *addr);
-static void sys_munmap(int fd);
+static mapid_t sys_mmap(int fd, void *addr);
+static void sys_munmap(mapid_t mapping);
 
 /* Helper functions for system calls. */
 static struct file* get_file(int fd);
@@ -503,14 +502,15 @@ sys_close(int fd)
   lock_release(&secure_file);
 }
 
-static void
+/* Maps the file open as FD into the process' virtual address space - entire file mapped into consecutive virtual pages starting at ADDR.  */
+static mapid_t
 sys_mmap(int fd, void *addr)
 {
-
+  return 0;
 }
 
 static void
-sys_munmap(int fd)
+sys_munmap(mapid_t mapping)
 {
 
 }
