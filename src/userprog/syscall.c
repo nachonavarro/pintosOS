@@ -158,7 +158,7 @@ syscall_handler (struct intr_frame *f)
     {
         int fd     = (int)get_word_on_stack(f, 1);
         void *addr = (void *)get_word_on_stack(f, 2);
-        f->eax = sys_mmap(fd, addr);
+        //f->eax = sys_mmap(fd, addr);
         break;
     }
     case SYS_MUNMAP:

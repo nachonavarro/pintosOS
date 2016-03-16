@@ -2,6 +2,11 @@
 #define VM_PAGE_H
 
 #include "lib/kernel/hash.h"
+#include <stdio.h>
+
+#define MEGABYTE (1 << 20)
+#define STACK_LIMIT (8 * MEGABYTE)
+#define PUSHA_PERMISSION_BYTES 32
 
 struct spt_entry {
 	void   *vaddr;
@@ -23,6 +28,9 @@ void load_into_page(void *page, struct spt_entry *entry);
 void load_from_disk(void *page, struct spt_entry *entry);
 void load_file(void *page, struct spt_entry *entry);
 void load_mmf(void *page, struct spt_entry *entry);
+
+bool should_stack_grow(void *uaddr, void *esp);
+void grow_stack(void *addr);
 
 
 // void spt_modify(struct hash *spt, struct spt_entry *entry)
