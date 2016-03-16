@@ -14,9 +14,14 @@ struct mmap_mapping {
                file. */
   //TODO: Not sure whether to have size or end_uaddr
   void *uaddr; /* Start address that file is mapped to. */
+  //TODO: For eviction, having a file descriptor here may be better?
+  //      Maybe we need both
+  struct file *file; /* File that is mapped. Not the same struct as in
+                        another mmap_mapping for same file, as
+                        file_reopen() is used. */
 };
 
-bool mmap_table_insert(struct hash *mmap_table, void *uaddr, int size);
+bool mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, struct file* file);
 struct mmap_mapping *mmap_mapping_lookup(struct hash *mmap_table, const mapid_t mapid);
 void mmap_mapping_delete(struct hash *mmap_table, const mapid_t mapid);
 unsigned mapid_hash(const struct hash_elem *, void *);

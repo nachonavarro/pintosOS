@@ -13,7 +13,7 @@ static void free_using_hash_elem(struct hash_elem *, void*);
    before inserting it into mmap_table. Returns false if not enough
    space to malloc. */
 bool
-mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, mapid_t mapid) {
+mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, mapid_t mapid, struct file *file) {
   /* Freed in mmap_mapping_delete(). */
   struct mmap_mapping *mmap = malloc(sizeof(struct mmap_mapping));
   if (mmap == NULL) {
@@ -22,6 +22,7 @@ mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, mapid_t mapid)
   mmap->uaddr = uaddr;
   mmap->size = size;
   mmap->mapid = mapid;
+  mmap->file = file;
 //  lock_acquire(&mmap_table_lock);
   hash_insert(mmap_table, &mmap->hash_elem);
 //  lock_release(&mmap_table_lock);
