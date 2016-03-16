@@ -19,6 +19,7 @@
 #endif
 #ifdef VM
 #include "vm/frame.h"
+#include "vm/mmap.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -106,7 +107,7 @@ void
 thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
-  printf("HERE");
+
   lock_init (&tid_lock);
   frame_table_init();
   /* Initialise the 64 queues */
@@ -247,9 +248,10 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  spt_init(&t->supp_pt);
 
 #ifdef VM
+  /* Initialise supplemental page table. */
+  spt_init(&t->supp_pt);
   /* Memory mapping initialisation. */
   hash_init(&t->mmap_table, mapid_hash, mapid_less, NULL);
   lock_init(&t->mmap_table_lock);
@@ -393,6 +395,9 @@ thread_exit (void)
   list_remove (&thread_current()->allelem);
   struct thread *cur = thread_current();
 #ifdef VM
+  //TODO: May need to free more resources from the supplemental table
+  /* Free the supplemental page table. */
+  spt_destroy(&cur->supp_pt);
   /* Frees resources of all entries in the mmap_table, as well as freeing the
      memory allocated for the table itself. */
   destroy_mmap_table(&cur->mmap_table);
@@ -402,7 +407,6 @@ thread_exit (void)
   sema_up(&cur->exit_sema);
   sema_down(&cur->before_exit_sema);
 #endif
-  spt_destroy(&cur->supp_pt);
   cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
