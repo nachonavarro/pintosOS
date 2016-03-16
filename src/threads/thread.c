@@ -248,6 +248,13 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+#ifdef VM
+  /* Memory mapping initialisation. */
+  hash_init(&t->mmap_table, mapid_hash, mapid_less, NULL);
+  lock_init(&t->mmap_table_lock);
+  t->next_mapid = (mapid_t) 0;
+#endif
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -840,13 +847,6 @@ init_thread (struct thread *t, const char *name, int priority)
   if (strcmp(name, "main") != 0) {
     list_push_front(&thread_current()->children, &t->child_elem);
   }
-#endif
-
-#ifdef VM
-  /* Memory mapping initialisation. */
-  hash_init(&t->mmap_table, mapid_hash, mapid_less, NULL);
-  lock_init(&t->mmap_table_lock);
-  t->next_mapid = (mapid_t) 0;
 #endif
 
   if(!thread_mlfqs) {
