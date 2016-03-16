@@ -146,20 +146,6 @@ page_fault (struct intr_frame *f)
 
   struct thread *cur = thread_current();
 
-  // pg_round_down is static... can we find another way?
-
-  // struct spt_entry *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
-  struct spt_entry *entry = get_spt_entry(&cur->supp_pt, fault_addr);
-
-
-  if (entry->swap) {
-    load_from_disk(entry);
-  } else if (entry->file) {
-    load_file(entry);
-  } else if (entry->mmf) {
-    load_mmf(entry);
-  }
-
 
   // 2. Obtain frame to store the page
 
@@ -184,6 +170,20 @@ page_fault (struct intr_frame *f)
 
   if (user) {
 	  sys_exit(ERROR);
+  }
+
+  // pg_round_down is static... can we find another way?
+
+  // struct spt_entry *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
+  struct spt_entry *entry = get_spt_entry(&cur->supp_pt, fault_addr);
+
+
+  if (entry->swap) {
+    load_from_disk(entry);
+  } else if (entry->file) {
+    load_file(entry);
+  } else if (entry->mmf) {
+    load_mmf(entry);
   }
 
 

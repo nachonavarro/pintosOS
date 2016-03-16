@@ -63,15 +63,12 @@ get_spt_entry(struct hash *table, void *address)
 
   // TODO: Replace palloc_get_page with frame_alloc?
 
-  void *new_page = palloc_get_page(0);
-	struct spt_entry *entry = new_page;
+	struct spt_entry *entry;
 
 	entry->vaddr = address;
   lock_acquire(&spt_lock);
 	struct hash_elem *hash_elem = hash_find(table, &entry->elem);
   lock_release(&spt_lock);
-
-	palloc_free_page(new_page);
 
   if (hash_elem == NULL)
     return NULL;
