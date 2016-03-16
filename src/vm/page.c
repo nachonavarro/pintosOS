@@ -7,8 +7,8 @@
 static struct lock spt_lock;
 
 static unsigned generate_hash(const struct hash_elem *e, void *aux UNUSED);
-static bool compare_less_hash(const struct hash_elem *a, const struct hash_elem *b, void *aux);
-static void hash_free_elem(struct hash_elem *e, void *aux);
+static bool compare_less_hash(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
+static void hash_free_elem(struct hash_elem *e, void *aux UNUSED);
 
 /* Initialises the supplemental page table and the spt_lock */
 void
@@ -49,12 +49,11 @@ spt_insert(struct hash *spt, struct spt_entry *entry)
   struct hash_elem *elem;
   lock_acquire(&spt_lock);
   elem = hash_insert(spt, &entry->elem);
-  lock_release(&spt_lock);
 
   if (elem != NULL)
-    lock_acquire(&spt_lock);
     hash_replace(spt, &entry->elem);
-    lock_release(&spt_lock);
+
+  lock_release(&spt_lock);
 }
 
 /* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
@@ -117,7 +116,7 @@ spt_destroy (struct hash *hashmap)
 
 /* Frees an spt_entry, used in spt_destroy. */
 static void 
-hash_free_elem (struct hash_elem *e, void *aux)
+hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
   palloc_free_page(entry);
