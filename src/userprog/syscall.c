@@ -11,7 +11,6 @@
 #include "devices/input.h"
 #include "threads/malloc.h"
 #include "lib/string.h"
-#include "lib/user/syscall.h"
 
 /* Ensures multiple threads cannot call file system code at the same time. */
 struct lock secure_file;
@@ -29,6 +28,8 @@ static int sys_write(int fd, const void *buffer, unsigned size);
 static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 static void sys_close(int fd);
+static mapid_t sys_mmap(int fd, void *addr);
+static void sys_munmap(mapid_t mapping);
 
 /* Helper functions for system calls. */
 static struct file* get_file(int fd);
@@ -152,6 +153,19 @@ syscall_handler (struct intr_frame *f)
       int fd        = (int)get_word_on_stack(f, 1);
       sys_close(fd);
       break;
+    }
+    case SYS_MMAP:
+    {
+        int fd     = (int)get_word_on_stack(f, 1);
+        void *addr = (void *)get_word_on_stack(f, 2);
+        f->eax = sys_mmap(fd, addr);
+        break;
+    }
+    case SYS_MUNMAP:
+    {
+        mapid_t mapping = (mapid_t)get_word_on_stack(f, 1);
+        sys_munmap(mapping);
+        break;
     }
     default:
     {
@@ -487,9 +501,134 @@ sys_close(int fd)
   lock_release(&secure_file);
 }
 
+//TODO: "Your VM system must lazily load pages in mmap regions"
+/* Maps the file open as FD into the process' virtual address space - entire
+   file mapped into consecutive virtual pages starting at ADDR. (Lazy load
+   pages in mmap regions). (Evicting a page mapped by mmap writes it back to
+   the actual file it was mapped from). (Set spare bytes on final page to zero
+   when that page is faulted in the file system, and ignore these bytes when
+   page is written back to disk). Returns mapid_t for the mapping, or -1 on
+   failure. Failure occurs when file has length 0, if addr is not page aligned,
+   if range of pages mapped overlaps any existing mapped pages (including the
+   stack or pages mapped at executable load time), if addr is 0, or if fd
+   is 0 or 1. */
+static mapid_t
+sys_mmap(int fd, void *addr)
+{
+  /* Check that fd is a valid file descriptor. */
+  check_fd(fd);
+
+  /* Cannot map stdin or stdout. */
+  if (fd == STDIN_FILENO || fd == STDOUT_FILENO) {
+    return ERROR;
+  }
+
+  /* Address to map to cannot be 0, because some Pintos code assumes virtual
+     page 0 is not mapped. */
+  if (addr == 0) {
+    return ERROR;
+  }
+
+  int size = sys_filesize(fd);
+
+  /* Cannot map a file of size 0 bytes. */
+  if (size == 0) {
+    return ERROR;
+  }
+
+  /* ADDR must be page-aligned. */
+  if (pg_ofs(addr) != 0) {
+    return ERROR;
+  }
+
+  //TODO: Still need to 'return ERROR' if range of pages mapped overlaps any
+  //      existing mapped pages.
+  /* num_stack_pages is number of pages for the stack for this process, I
+     think. However, could probably use the esp of the current thread, and then
+     simply compare this with ADDR
+     (Want ADDR < esp OR ADDR < PHYS_BASE - num_stack_pages*PGSIZE) */
+  int num_stack_pages = 0; //TODO: Change from 0
+  if (addr > PHYS_BASE - (num_stack_pages*PGSIZE)) {
+    return ERROR;
+  }
+
+  /* If ADDR is not in user/process address space, we cannot map
+       the file there. */
+  if (!is_user_vaddr(addr)) {
+    sys_exit(ERROR); //TODO: Not sure whether to return ERROR instead
+  }
+
+  /* Pages is number of pages needed to map file.
+     (size % PGSIZE) gives the number of spare bytes on the final page.
+     This is necessary because the division is integer division, and so
+     will round down, but we want it to round up. */
+  int pages = size / PGSIZE;
+  if ((size % PGSIZE) != 0) {
+    pages++;
+  }
+
+  //TODO: Use supplemental page table, potentially, to check if pages needed
+  //      overlaps any existing mapped pages
+  /* Check that the contiguous range of pages to be mapped doesn't overlap
+     any existing set of mapped pages (Not including stack). */
+  int i;
+  for (i = 0; i < pages; i++) {
+    //TODO: Check addr + (i * PGSIZE) in supplementary page table here?
+    //      Return false if any entry in this table exists
+  }
+
+  //TODO: Insert all new pages into supplementary page table???? Is this
+  //      the lazy thing??? I thought lazy means only when we try to access
+  //      it and page fault, then we check to see if we have it, then try
+  //      to load it
+
+  //TODO: Need to file_reopen(file corresponding to fd), then put this in
+  //      the mmap_mapping (i.e. pass it to mmap_table_insert), so that if
+  //      sys_close(fd) is called, any mappings are still valid
+  //      (they are valid until process exits or munmap is called).
+  //      (REMEMBER, the mmap'ed files don't have fd's - the struct file *file
+  //      member of mmap_mapping will 'do this job'). I think this struct file *file
+  //      will also help us evict and write back to file it was mapped from.
+  //      ACQUIRE SECURE LOCK TO DO FILE_REOPEN!!!!!1
+  lock_acquire(&secure_file);
+//  struct file *old_file = get_file_by_fd(fd);
+  struct file *old_file = NULL;
+  struct file *file = file_reopen(old_file);
+  lock_release(&secure_file);
+
+  struct thread *cur = thread_current();
+  mapid_t mapid = cur->next_mapid;
+  /* Lock must be acquired to call hash_insert, and since we have
+     thread_current() here alreadym it makes sense to lock here too. */
+  lock_acquire(&cur->mmap_table_lock);
+  bool success = mmap_table_insert(&cur->mmap_table, addr, size, mapid, file);
+  lock_release(&cur->mmap_table_lock);
+
+  /* Return -1 if mmap_table_insert wasn't successful (meaning there isn't
+     enough space to malloc for a struct mmap_mapping *). */
+  if (!success) {
+    return ERROR;
+  }
+
+  /* Increment next_mapid for this thread, so that the next mmap will have a
+     different mapid, ensuring unique mapids for all mappings for a process. */
+  cur->next_mapid++;
+
+  /* If successful, function returns the mapid that uniquely identifies
+     the mapping within the process. */
+  return mapid;
+}
+
+static void
+sys_munmap(mapid_t mapping UNUSED)
+{
+
+}
+
 /* Returns the file corresponding the to supplied file descriptor
    in the current thread's list of files that it can see. */
-static struct file* get_file(int fd) 
+static struct file*
+get_file(int fd)
 {
   struct thread *cur = thread_current();
   struct list_elem *e;
