@@ -5,6 +5,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/syscall.h"
+#include "threads/vaddr.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 /* Page fault error code bits that describe the cause of the exception.  */
 #define PF_P 0x1    /* 0: not-present page. 1: access rights violation. */

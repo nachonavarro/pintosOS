@@ -137,64 +137,78 @@ page_fault (struct intr_frame *f)
      be assured of reading CR2 before it changed). */
   intr_enable ();
 
-
-
-  // TODO: Change page fault handling
-
-  // 1. Locate page that faulted in SPT
-
-
-  struct thread *cur = thread_current();
-
-  // pg_round_down is static... can we find another way?
-
-  // struct spt_entry *entry = get_spt_entry(&cur->supp_pt, pg_round_down(fault_addr));
-  struct spt_entry *entry = get_spt_entry(&cur->supp_pt, fault_addr);
-
-
-  if (entry->swap) {
-    load_from_disk(entry);
-  } else if (entry->file) {
-    load_file(entry);
-  } else if (entry->mmf) {
-    load_mmf(entry);
-  }
-
-
-  // 2. Obtain frame to store the page
-
-
-  // void *new_frame = frame_alloc(PAL_USER, upage);
-
-
-  // 3. Fetch the data into the frame
-
-  // 4. Point page table entry for the faulting virtual address to the frame
-
-  /* Exit status set to -1 when exception causes process to exit. */
-  thread_current()->exit_status = ERROR;
-
-  /* Count page faults. */
-  page_fault_cnt++;
-
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  if (user) {
-	  sys_exit(ERROR);
+  struct thread *cur = thread_current();
+
+  // 1. Locate page that faulted in SPT
+
+  // Getting the page address by rounding fault_addr down to nearest page size multiple
+  void *page_addr = (void *) ((uintptr_t) fault_addr & ~PGMASK);
+
+  /* If memory reference is invalid, or user is accessing kernel memory, 
+     or trying to write to read-only page, terminate process and free resources */
+  if (page_addr == NULL || (is_user_vaddr(page_addr) && !user) || !not_present)
+  {
+    /* Exit status set to -1 when exception causes process to exit. */
+    cur->exit_status = ERROR;
+
+    /* Count page faults. */
+    page_fault_cnt++;
+
+    // TODO: What happens if page fault in kernel?
+    if (user) {
+      sys_exit(ERROR);
+    }
+
+    return;
+  } 
+ 
+  // Getting the spt_entry for the page from the supplemental page table
+  struct spt_entry *entry = get_spt_entry(&cur->supp_pt, page_addr);
+
+  /* If page should not expect any data, terminate process and free resources */
+  if (entry == NULL)
+  {
+    /* Exit status set to -1 when exception causes process to exit. */
+    cur->exit_status = ERROR;
+    /* Count page faults. */
+    page_fault_cnt++;
+
+    if (user) {
+      sys_exit(ERROR);
+    }
+    return;
   }
 
+
+  // 2. Obtain frame to store the page
+
+  void *page = frame_alloc(PAL_USER, page_addr);
+
+  // 3. Fetch the data into the frame
+
+  // Load data into the page
+  load_into_page(page, entry);
+
+  // 4. Point page table entry for the faulting virtual address to the frame
+
+  entry->frame_addr = page;
+
+
+  // TODO: Delete following lines?
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  // printf ("Page fault at %p: %s error %s page in %s context.\n",
+  //         fault_addr,
+  //         not_present ? "not present" : "rights violation",
+  //         write ? "writing" : "reading",
+  //         user ? "user" : "kernel");
+  // kill (f);
 }
 

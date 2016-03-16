@@ -79,30 +79,49 @@ get_spt_entry(struct hash *table, void *address)
 	return hash_entry(hash_elem, struct spt_entry, elem);
 }
 
-
+// TODO: Do we want to delete from hash table after swapping out?
 void
-load_from_disk(struct spt_entry *spt_entry)
+load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	struct thread *cur = thread_current();
-	void *page = frame_alloc(PAL_USER, spt_entry->vaddr);
 	swap_out(page, spt_entry->swap_slot);
-  lock_acquire(&spt_lock);
-	hash_delete (&cur->supp_pt, &spt_entry->elem);
-  lock_release(&spt_lock);
 }
 
 void
-load_file(struct spt_entry *entry)
+load_file(void *page, struct spt_entry *entry)
 {
     entry->file = true;
     return;
 }
 
 void
-load_mmf(struct spt_entry *entry)
+load_mmf(void *page, struct spt_entry *entry)
 {
     entry->mmf = true;
     return;
+}
+
+// Loads the data into PAGE from its location in SPT_ENTRY
+void load_into_page (void *page, struct spt_entry *spt_entry)
+{
+
+  // TODO: Use memcpy from file system, swap slot, or zero the page?
+
+  // If page data is in swap slot, swap out, into the frame
+  if (spt_entry->swap) {
+    load_from_disk(page, spt_entry);
+
+  // If page data is in file system, load file into frame 
+  } else if (spt_entry->file) {
+    load_file(page, spt_entry);
+
+  // If page data is in memory mapped files, load into frame
+  } else if (spt_entry->mmf) {
+    load_mmf(page, spt_entry);
+
+  // If page should be all-zero, fill it with zeroes
+  } else {
+    // TODO: zero the page?
+  }
 }
 
 /* Frees each spt_entry of the hashmap and destroys it. */
