@@ -592,7 +592,8 @@ sys_mmap(int fd, void *addr)
   //      will also help us evict and write back to file it was mapped from.
   //      ACQUIRE SECURE LOCK TO DO FILE_REOPEN!!!!!1
   lock_acquire(&secure_file);
-  struct file *old_file = get_file_by_fd(fd);
+//  struct file *old_file = get_file_by_fd(fd);
+  struct file *old_file = NULL;
   struct file *file = file_reopen(old_file);
   lock_release(&secure_file);
 
@@ -602,7 +603,7 @@ sys_mmap(int fd, void *addr)
      thread_current() here alreadym it makes sense to lock here too. */
   lock_acquire(&cur->mmap_table_lock);
   bool success = mmap_table_insert(&cur->mmap_table, addr, size, mapid, file);
-  lock_release(&cur>mmap_table_lock);
+  lock_release(&cur->mmap_table_lock);
 
   /* Return -1 if mmap_table_insert wasn't successful (meaning there isn't
      enough space to malloc for a struct mmap_mapping *). */
@@ -620,7 +621,7 @@ sys_mmap(int fd, void *addr)
 }
 
 static void
-sys_munmap(mapid_t mapping)
+sys_munmap(mapid_t mapping UNUSED)
 {
 
 }

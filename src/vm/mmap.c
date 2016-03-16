@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include "vm/mmap.h"
 #include "threads/synch.h"
+#include "threads/malloc.h"
 
 //TODO: Don't think we need to flush or reset next_mapid anymore, as each
 //      process has a mmap_table and next_mapid, and flushing and resetting
@@ -53,7 +54,7 @@ mmap_mapping_delete(struct hash *mmap_table, const mapid_t mapid) {
     return;
   }
 //  lock_acquire(&mmap_table_lock);
-  hash_delete(mmap_table, mmap->hash_elem);
+  hash_delete(mmap_table, &mmap->hash_elem);
 //  lock_release(&mmap_table_lock);
   /* Free the struct mmap_mapping allocated using malloc in
      mmap_table_insert(). */

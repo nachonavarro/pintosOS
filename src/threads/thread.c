@@ -106,7 +106,7 @@ void
 thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
-
+  printf("HERE");
   lock_init (&tid_lock);
   frame_table_init();
   /* Initialise the 64 queues */
@@ -387,7 +387,7 @@ thread_exit (void)
 #ifdef VM
   /* Frees resources of all entries in the mmap_table, as well as freeing the
      memory allocated for the table itself. */
-  destroy_mmap_table(cur->mmap_table);
+  destroy_mmap_table(&cur->mmap_table);
 #endif
 
 #ifdef USERPROG

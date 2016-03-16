@@ -21,7 +21,7 @@ struct mmap_mapping {
                         file_reopen() is used. */
 };
 
-bool mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, struct file* file);
+bool mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, mapid_t mapid, struct file* file);
 struct mmap_mapping *mmap_mapping_lookup(struct hash *mmap_table, const mapid_t mapid);
 void mmap_mapping_delete(struct hash *mmap_table, const mapid_t mapid);
 unsigned mapid_hash(const struct hash_elem *, void *);
