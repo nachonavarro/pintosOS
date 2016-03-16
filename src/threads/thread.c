@@ -17,6 +17,9 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#ifdef VM
+#include "vm/frame.h"
+#endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -105,6 +108,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
+  frame_table_init();
   /* Initialise the 64 queues */
   if (thread_mlfqs) {
     int i;
@@ -243,6 +247,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  spt_init(&t->supp_pt);
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'

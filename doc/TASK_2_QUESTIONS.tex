@@ -93,10 +93,23 @@ The following steps are taken in order to parse the file's arguments:
 \item We allocate memory for a new struct \texttt{process\_info} by using the \texttt{palloc\_get\_page()} method.
 \item We create a copy of the given unparsed, const string by using the \texttt{memcpy()} method, after having checked that we have enough space in memory to do so. This is done because the \texttt{strtok\_r} method needs a modifiable string to tokenise.
 \item We then use the \texttt{strtok\_r()} method in a loop to tokenise the given string into arguments each time we encounter a space character. If the \texttt{NULL} token is found, this means we have reached the end of the string and therefore all the arguments have been parsed. We store each token in the \texttt{argv} array of our \texttt{process\_info} struct and we increment \texttt{argc} in each iteration of the loop to reflect the number of tokens and therefore of arguments. We also check in every iteration of the tokenising loop that we have enough space in memory to store the next tokenised argument in our \texttt{process\_info} struct.
-\item The use of \texttt{strtok\_r()} makes sure that the arguments are stored in the right order in the \texttt{argv} field of the struct, which allows a safe and correct setup of the stack when pushing the arguments in \texttt{start\_process()}.
-We indeed push the arguments in reverse order when setting up the stack as the stack grows downwards.
 
 \end{itemize}
+
+
+We then pass our \texttt{process\_info} struct to the \texttt{start\_process()} method so it can access the number of arguments and the arguments themselves. The following steps are taken to ensure the arguments are correctly set up on the stack:
+
+\begin{itemize}
+
+\item We find the address of the bottom of the stack page, using the stack pointer that is set at the top of the stack page. This will allow us to make sure the stack doesn't oveflow. We will indeed check that the stack pointer's position is not lower that the bottom of the stack page, everytime we push a string or a pointer to the stack.
+\item We push the process's arguments onto the stack, in reverse order, and then recycle the \texttt{argv} field of our \texttt{process\_info} struct to store pointers to the arguments, which will be pushed to the stack later.
+\item We round down the stack pointer to the nearest word multiple for faster access to the arguments.
+\item We push a null pointer sentinel, followed by the pointers to the arguments, in reverse order as the stack grows downwards. 
+\item Finally, we push a pointer to the first argument pointer, followed by the number of arguments \texttt{argc} and a fake return address.
+\item If a stack overflow occurs or the process does not load properly, the thread exits.
+
+\end{itemize}
+
 
 \subsection{Rationale}
 

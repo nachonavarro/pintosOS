@@ -19,16 +19,18 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 static struct process_info* parse_filename_and_args(
                               const char* file_name_and_args);
-static void push_arguments_on_stack(struct process_info *process_to_start, 
+static bool push_arguments_on_stack(struct process_info *process_to_start, 
                                     void **esp);
-static void put_string_in_stack(void **esp, char *string);
-static void put_uint_in_stack(void **esp, uint32_t n);
+static bool put_string_in_stack(void **esp, char *string, uint32_t min_pointer);
+static bool put_uint_in_stack(void **esp, uint32_t n, uint32_t min_pointer);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -45,18 +47,16 @@ process_execute (const char *file_name_and_args)
   struct process_info *process = parse_filename_and_args(file_name_and_args);
 
   /* In case of an error in the argument parsing */
-  if (process == NULL) {
+  if (process == NULL)
     return TID_ERROR;
-  }
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (process->filename, PRI_DEFAULT, start_process, process);
 
   /* If thread could not be created, free the page allocated for the
      process. */
-  if (tid == TID_ERROR) {
+  if (tid == TID_ERROR)
     palloc_free_page (process);
-  }
 
   return tid;
 
@@ -73,16 +73,12 @@ parse_filename_and_args (const char* file_name_and_args)
 
   /* Checking the page allocation worked correctly */
   if (p == NULL)
-  {
-    palloc_free_page(new_page);
     return NULL;
-  }
 
   /* Create copy of file_name_and_args const string as strtok_r needs modifiable 
      string for tokenising */
   int arg_length = strlen(file_name_and_args) + 1;
   void *starting_address = new_page + PGSIZE - arg_length;
-
 
   /* Checking the arguments are small enough to fit into the page */
   if ((uint32_t) arg_length > (PGSIZE - sizeof(struct process_info))) {
@@ -111,7 +107,7 @@ parse_filename_and_args (const char* file_name_and_args)
     p->argv[p->argc] = token;
     p->argc++;
 
-    /* Checking that the stack isn't overflowing */
+    /* Checking that there is enough memory to store the token in the struct */
     if ((uintptr_t) &p->argv[p->argc] + sizeof(uint32_t) 
          >= (uintptr_t) starting_address) 
     {
@@ -135,43 +131,42 @@ start_process (void *process)
 
   struct process_info *process_to_start = (struct process_info *)process;
   struct intr_frame if_;
-  bool success;
+  bool load_success;
+  bool push_success;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (process_to_start->filename, &if_.eip, &if_.esp);
+  load_success = load (process_to_start->filename, &if_.eip, &if_.esp);
 
   struct thread *cur = thread_current();
 
   /* Set thread's executable file to the file that was loaded, if it was
      indeed an executable file. */
-  if (success) {
-    strlcpy(cur->executable, process_to_start->filename,
-                      strlen(process_to_start->filename) + 1);
-  }
+  if (load_success)
+    strlcpy(cur->executable, 
+            process_to_start->filename,
+            strlen(process_to_start->filename) + 1);
 
   /* Set the current thread's 'loaded' member to the return value from load,
      and then call sema_up on the thread's load_sema, so that sys_exec knows
      to now check whether the process has loaded successfully or not. */
-  cur->loaded = success;
+  cur->loaded = load_success;
   sema_up(&cur->load_sema);
 
   /* Push the process arguments on to the stack using a helper method, if
      the process successfully loaded. */
-  if (success) {
-    push_arguments_on_stack(process_to_start, &if_.esp);
-  }
+  if (load_success)
+    push_success = push_arguments_on_stack(process_to_start, &if_.esp);
 
   /* No longer need this page, as all required information is on the stack. */
   palloc_free_page (process_to_start);
 
-  /* If load failed, quit. */
-  if (!success) {
+  /* If load or push to stack failed, quit. */
+  if (!load_success || !push_success)
     thread_exit ();
-  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -184,13 +179,23 @@ start_process (void *process)
 }
 
 /* Helper method which pushes a process' arguments onto the stack 
-   given a process_info struct. */
-static void 
+   given a process_info struct. 
+   Returns true if the arguments have successfully been pushed to the stack,
+   otherwise returns false. */
+static bool 
 push_arguments_on_stack(struct process_info *p, void **esp)
 {
+
+  /* Finding the address of the bottom of the stack.
+     The stack pointer could point inside the stack page so we increment it
+     until we reach a multiple of PGSIZE. */
+  uint32_t top_of_stack = (uint32_t) *esp;
+  uint32_t bottom_of_stack = top_of_stack - PGSIZE;
+
   /* Pushing arguments to the stack in reverse order */
   for (int j = p->argc; j > 0; j--) {
-    put_string_in_stack(esp, p->argv[j-1]);
+    if (!put_string_in_stack(esp, p->argv[j-1], bottom_of_stack))
+      return false;
     p->argv[j-1] = *esp;
   }
 
@@ -201,39 +206,57 @@ push_arguments_on_stack(struct process_info *p, void **esp)
   } 
 
   /* Pushing null pointer sentinel */
-  put_uint_in_stack(esp, 0);
+  if (!put_uint_in_stack(esp, 0, bottom_of_stack))
+    return false;
 
   /* Pushing pointers to the arguments in reverse order */
   for (int k = p->argc; k > 0; k--) {
-    put_uint_in_stack(esp, (uint32_t) p->argv[k-1]);
+    if (!put_uint_in_stack(esp, (uint32_t) p->argv[k-1], bottom_of_stack))
+      return false;
   }
 
   /* Pushing pointer to the first pointer */
-  put_uint_in_stack(esp, (uint32_t) *esp);
-
+  if (!put_uint_in_stack(esp, (uint32_t) *esp, bottom_of_stack))
+    return false;
 
   /* Pushing number of arguments */
-  put_uint_in_stack(esp, p->argc);
+  if (!put_uint_in_stack(esp, p->argc, bottom_of_stack))
+    return false;
 
   /* Pushing fake return address */
-  put_uint_in_stack(esp, 0);
+  if (!put_uint_in_stack(esp, 0, bottom_of_stack))
+    return false;
+
+  return true;
 }
 
-/* Pushes a string onto the stack at the next location given by the stack ptr */
-static void
-put_string_in_stack (void **esp, char *string)
+/* Pushes a string onto the stack at the next location given by the stack ptr.
+   Returns true if the push is successful, otherwise there is a stack
+   overflow and returns null. */
+static bool
+put_string_in_stack (void **esp, char *string, uint32_t bottom_of_stack)
 {
   int str_length = strlen(string) + 1;
   *esp -= str_length;
+  if (((uint32_t) (*esp)) < bottom_of_stack) {
+    return false;
+  }
   memcpy(*esp, string, str_length);
+  return true;
 }
 
-/* Pushes a uint32_t on the stack at the next location given by the stack ptr */
-static void
-put_uint_in_stack (void **esp, uint32_t n) 
+/* Pushes a uint32_t on the stack at the next location given by the stack ptr. 
+   Returns true if the push is successful, otherwise there is a stack
+   overflow and returns null. */
+static bool
+put_uint_in_stack (void **esp, uint32_t n, uint32_t bottom_of_stack) 
 {
   *esp -= sizeof(uint32_t);
+  if (((uint32_t) (*esp)) < bottom_of_stack) {
+    return false;
+  }
   *((uint32_t*) *esp) = n;
+  return true;
 }
 
 
@@ -254,7 +277,8 @@ process_wait (tid_t child_tid)
   for (e = list_begin(children); e != list_end(children); e = list_next(e)) 
   {
     struct thread *t = list_entry(e, struct thread, child_elem);
-    if (t->tid == child_tid) {
+    if (t->tid == child_tid) 
+    {
       child = t;
       break;
     }
@@ -263,9 +287,9 @@ process_wait (tid_t child_tid)
   /* If pid does not refer to a direct child of the calling process, -1
      is returned. -1 is also returned if wait has already been called on
      this thread. */
-  if (child == NULL || child->waited_on) {
+  if (child == NULL || child->waited_on)
     return ERROR;
-  }
+
 
   /* Don't need to set to false again, because the thread will be
      terminated once it is no longer being waited on by the parent,
@@ -280,9 +304,8 @@ process_wait (tid_t child_tid)
      can just return exit status. */
   sema_down(&child->exit_sema);
 
-  /* Don't remove from the terminated child from the parents list of children,
-     because we still want to be able to check to see if we have already called
-     wait on this child. */
+  /* Removing the terminated child from the parents list of children */
+  list_remove(&child->child_elem);
 
   /* Have changed page_fault() to set exit status to -1, so we can
      still just return exit_status in the case that the process was
@@ -301,7 +324,8 @@ process_exit (void)
   uint32_t *pd;
 
   /* Close all files that this thread had open. */
-  while(!list_empty(&cur->files)) {
+  while(!list_empty(&cur->files)) 
+  {
     struct list_elem* e = list_begin(&cur->files);
     struct proc_file* f = list_entry(e, struct proc_file, file_elem);
     file_close(f->file);
@@ -608,14 +632,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = frame_alloc(PAL_USER, upage);
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          palloc_free_page (kpage);
+          frame_free(kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -623,7 +647,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          palloc_free_page (kpage);
+          frame_free(kpage);
           return false; 
         }
 
@@ -643,16 +667,18 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+
+  kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = install_page (upage, kpage, true);
       if (success) 
       {
         *esp = PHYS_BASE;
       }
       else
-        palloc_free_page (kpage);
+        frame_free(kpage);
     }
   return success;
 }

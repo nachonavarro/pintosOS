@@ -10,7 +10,7 @@ static int pages_in_swap_space;
 
 
 void
-swap_init()
+swap_init(void)
 {
     swap_space = block_get_role(BLOCK_SWAP);
     pages_in_swap_space = block_size(swap_space) / SECTORS_PER_PAGE;
@@ -28,8 +28,7 @@ swap_in(void *buf)
                                     NUM_OF_SLOTS_TO_SWAP, false);
     if (free_slot_index == BITMAP_ERROR)
         {
-            // Don't know if we need an algorithm for swapping when full or just any swap_slot will do.
-            free_slot_index = 1;
+            PANIC("No swap space available.");
         }
 
     lock_release(&swap_lock);
@@ -38,9 +37,6 @@ swap_in(void *buf)
         {
             block_write(swap_space, SECTORS_PER_PAGE * free_slot_index + i, buf + i);
         }
-
-    int i = 0;
-
 }
 
 
@@ -55,19 +51,9 @@ swap_out(void *buf, size_t swap_slot)
     int i;
     for (i = 0; i < SECTORS_PER_PAGE; i++)
         {
-            block_read(swap_space, i, SECTORS_PER_PAGE * swap_slot + i, buf + i);
+            void *loc_buf = buf + i;
+            block_read(swap_space, SECTORS_PER_PAGE * swap_slot + i, loc_buf);
         }
-}
-
-void
-free_slot(size_t swap_slot)
-{
-    int i;
-    for (i = 0; i < SECTORS_PER_PAGE; i++)
-            {
-                //TODO: Spec says we should allow freeing a swap slot. However I don't malloc,
-                // should we just set to null the swap_slot?
-            }
 }
 
 
