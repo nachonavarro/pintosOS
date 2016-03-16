@@ -79,5 +79,26 @@ load_mmf(struct spt_entry *entry)
     return;
 }
 
+/* The heuristic to check if stack should grow. */
+bool
+should_stack_grow(void *addr, void *esp)
+{
+    bool heuristic;
+    /* Check fault address doesn't pass stack limit growth. */
+    heuristic = (PHYS_BASE - pg_round_down(addr) <= STACK_LIMIT);
+    /* Check fault address is above the limit of the stack minus the permission bytes. */
+    heuristic = addr >= esp - PUSHA_PERMISSION_BYTES;
+    return heuristic;
+}
+
+void
+grow_stack(void *addr)
+{
+    void *page = frame_alloc(PAL_USER, addr);
+    /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
+    pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
+}
+
+
 
 

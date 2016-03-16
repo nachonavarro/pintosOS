@@ -178,6 +178,8 @@ page_fault (struct intr_frame *f)
 		load_file(entry);
 	} else if (entry->mmf) {
 		load_mmf(entry);
+	} else if (stack_should_grow(fault_addr, f->esp)) {
+	    grow_stack(fault_addr);
 	}
 
 
