@@ -8,6 +8,7 @@
 #include "fixed-point.h"
 #include "filesys/directory.h"
 #include "vm/mmap.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -21,6 +22,7 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
@@ -184,6 +186,8 @@ struct thread
     mapid_t next_mapid; /* Next mmap mapping for this thread will take this as its
                            mapid. Incremented after a new mapping is added.
                            Initially set to 0. */
+    struct hash supp_pt; /* Hash map of virtual addresses to
+                            additional information */
 #endif
 
     /* Owned by thread.c. */

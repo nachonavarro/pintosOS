@@ -2,6 +2,7 @@
 #include "vm/frame.h"
 #include "lib/random.h"
 #include "threads/malloc.h"
+#include "threads/palloc.h"
 
 static struct list frame_table;
 static struct lock frame_table_lock;

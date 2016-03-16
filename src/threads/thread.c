@@ -247,6 +247,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  spt_init(&t->supp_pt);
 
 #ifdef VM
   /* Memory mapping initialisation. */
@@ -401,6 +402,7 @@ thread_exit (void)
   sema_up(&cur->exit_sema);
   sema_down(&cur->before_exit_sema);
 #endif
+  spt_destroy(&cur->supp_pt);
   cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
