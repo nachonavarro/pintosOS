@@ -27,13 +27,13 @@ struct spt_entry {
     void   *frame_addr;
     size_t swap_slot;
     enum page_info info;
-    struct file_info *file_info;
+    struct file_info file_info;
     struct hash_elem elem;
 };
 
 void spt_init(struct hash *spt);
 void spt_insert(struct hash *spt, struct spt_entry *entry);
-void spt_insert_file(struct file *f, size_t size, size_t offset);
+bool spt_insert_file(void *uaddr, void *kpage, struct file *f, size_t size, size_t offset);
 struct spt_entry* get_spt_entry(struct hash *table, void *address);
 void spt_destroy(struct hash *hashmap);
 
@@ -44,6 +44,7 @@ void load_mmf(void *page, struct spt_entry *entry);
 
 bool should_stack_grow(void *uaddr, void *esp);
 void grow_stack(void *addr);
+void print_page_info(void);
 
 
 // void spt_modify(struct hash *spt, struct spt_entry *entry)

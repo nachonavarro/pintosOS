@@ -332,6 +332,15 @@ process_exit (void)
     list_remove(&f->file_elem);
     free(f);
   }
+#ifdef VM
+
+  /* Frees resources of all entries in the mmap_table, as well as freeing the
+     memory allocated for the table itself. */
+  destroy_mmap_table(&cur->mmap_table);
+  //TODO: May need to free more resources from the supplemental table
+  /* Free process resources and destroy its supplemental page table. */
+  spt_destroy(&cur->supp_pt);
+#endif
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -527,8 +536,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
               if (!load_segment (file, file_page, (void *) mem_page,
-                                 read_bytes, zero_bytes, writable))
-                goto done;
+                                 read_bytes, zero_bytes, writable)){
+            	  goto done;
+              }
+
             }
           else
             goto done;
@@ -548,6 +559,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  printf("BOOL IN LOAD IS: %d\n",success);
   return success;
 }
 
@@ -622,7 +634,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -634,20 +645,37 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Get a page of memory. */
       uint8_t *kpage = frame_alloc(PAL_USER, upage);
       if (kpage == NULL)
-        return false;
+    	{
+    	  	printf("HELLO\n\n\n");
+        	return false;
+    	}
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      /* Track info for this page. */
+      //file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      //!spt_insert_file(upage, kpage, file, read_bytes, ofs))
+      //printf("userpage is %p\n", upage);
+      if (!spt_insert_file(upage, kpage, file, read_bytes, ofs))
         {
           frame_free(kpage);
+          printf("COULDNT INSERT FILE\n\n");
           return false; 
         }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      if (page_read_bytes != PGSIZE && page_zero_bytes != PGSIZE) {
+    	  file_seek (file, ofs);
+    	  int bytes_read = file_read (file, kpage, page_read_bytes);
+
+    	  if (bytes_read != (int) page_read_bytes)
+    	      return false;
+    	  memset (kpage + page_read_bytes, 0, page_zero_bytes);
+    	  printf("HERE!\n");
+      }
 
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
           frame_free(kpage);
+          printf("COULDNT INSTALLL FILE\n\n");
           return false; 
         }
 
@@ -669,7 +697,15 @@ setup_stack (void **esp)
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
 
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // REMEMBER TO FREE.
+  if (entry == NULL) {
+	  return false;
+  }
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
+  entry->frame_addr = kpage;
+  entry->vaddr = upage;
+  entry->info = SWAP;
+  spt_insert(&thread_current()->supp_pt, entry);
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);
@@ -680,6 +716,7 @@ setup_stack (void **esp)
       else
         frame_free(kpage);
     }
+  printf("SETUP STACK IS %d\n", success);
   return success;
 }
 
