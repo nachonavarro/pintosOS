@@ -56,7 +56,7 @@ spt_insert(struct hash *spt, struct spt_entry *entry)
 }
 
 bool
-spt_insert_file(void *uaddr, void *kpage, struct file *f, size_t size, size_t offset)
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
 {
 
   struct thread *cur = thread_current();
@@ -70,7 +70,6 @@ spt_insert_file(void *uaddr, void *kpage, struct file *f, size_t size, size_t of
   entry->file_info.offset = offset;
   entry->file_info.size = size;
   entry->info = FSYS;
-  entry->frame_addr = kpage;
   entry->vaddr = uaddr;
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
   if (elem == NULL) {

@@ -642,40 +642,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = frame_alloc(PAL_USER, upage);
-      if (kpage == NULL)
-    	{
-    	  	printf("HELLO\n\n\n");
-        	return false;
-    	}
 
       /* Track info for this page. */
       //file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
       //!spt_insert_file(upage, kpage, file, read_bytes, ofs))
       //printf("userpage is %p\n", upage);
-      if (!spt_insert_file(upage, kpage, file, read_bytes, ofs))
+      if (!spt_insert_file(upage, file, read_bytes, ofs))
         {
-          frame_free(kpage);
           printf("COULDNT INSERT FILE\n\n");
-          return false; 
-        }
-
-      if (page_read_bytes != PGSIZE && page_zero_bytes != PGSIZE) {
-    	  file_seek (file, ofs);
-    	  int bytes_read = file_read (file, kpage, page_read_bytes);
-
-    	  if (bytes_read != (int) page_read_bytes)
-    	      return false;
-    	  memset (kpage + page_read_bytes, 0, page_zero_bytes);
-    	  printf("HERE!\n");
-      }
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          frame_free(kpage);
-          printf("COULDNT INSTALLL FILE\n\n");
           return false; 
         }
 
