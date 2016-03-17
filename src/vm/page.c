@@ -3,6 +3,8 @@
 #include "threads/thread.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include "userprog/pagedir.h"
+#include "threads/malloc.h"
 
 static struct lock spt_lock;
 
@@ -56,6 +58,27 @@ spt_insert(struct hash *spt, struct spt_entry *entry)
   lock_release(&spt_lock);
 }
 
+void
+spt_insert_file(struct file *f, size_t size, size_t offset)
+{
+  struct thread *cur = thread_current();
+  struct spt_entry *entry;
+  struct hash_elem *elem;
+  lock_acquire(&spt_lock);
+  struct file_info *f_info = malloc(sizeof(struct file_info)); // WE NEED TO FREEEE.
+  f_info->f = f;
+  f_info->offset = offset;
+  f_info->size = size;
+  entry->file_info = f_info;
+  entry->info = FSYS;
+
+  elem = hash_insert(&cur->supp_pt, &entry->elem);
+  if (elem != NULL)
+    hash_replace(&cur->supp_pt, &entry->elem);
+
+  lock_release(&spt_lock);
+}
+
 /* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
@@ -80,47 +103,56 @@ get_spt_entry(struct hash *table, void *address)
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	struct thread *cur = thread_current();
-	void *page = frame_alloc(PAL_USER, spt_entry->vaddr);
+	//struct thread *cur = thread_current();
 	swap_out(page, spt_entry->swap_slot);
-	hash_delete (&cur->supp_pt, &spt_entry->elem);
 }
 
 void
-load_file(void *page, struct spt_entry *entry)
+load_file(void *kpage, struct spt_entry *entry)
 {
-    entry->file = true;
-    return;
+	struct thread *cur = thread_current();
+	struct file_info *f_info = entry->file_info;
+	size_t page_read_bytes = f_info->size;
+
+	/*Same as segment loop in exception.c*/
+	if (file_read (f_info->f, kpage, page_read_bytes) != (int) page_read_bytes)
+		{
+		  frame_free(kpage);
+		  return;
+	    }
+	// Should we keep a variable zero in file_info?
+	memset(kpage + page_read_bytes, 0, PGSIZE - page_read_bytes);
+	// Not sure if true should always be set.
+	pagedir_set_page(cur->pagedir, entry->vaddr, kpage, true);
+
+
 }
 
 void
 load_mmf(void *page, struct spt_entry *entry)
 {
-    entry->mmf = true;
     return;
 }
 
 // Loads the data into PAGE from its location in SPT_ENTRY
 void load_into_page (void *page, struct spt_entry *spt_entry)
 {
-
   // TODO: Use memcpy from file system, swap slot, or zero the page?
-
   // If page data is in swap slot, swap out, into the frame
-  if (spt_entry->swap) {
+  if (spt_entry->info == SWAP) {
     load_from_disk(page, spt_entry);
 
   // If page data is in file system, load file into frame 
-  } else if (spt_entry->file) {
+  } else if (spt_entry->info == FSYS) {
     load_file(page, spt_entry);
 
   // If page data is in memory mapped files, load into frame
-  } else if (spt_entry->mmf) {
+  } else if (spt_entry->info == MMAP) {
     load_mmf(page, spt_entry);
 
   // If page should be all-zero, fill it with zeroes
-  } else {
-    // TODO: zero the page?
+  } else if (spt_entry->info == ALL_ZERO){
+	memset(page, 0, PGSIZE);
   }
 }
 

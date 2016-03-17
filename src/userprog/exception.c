@@ -142,61 +142,53 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  /* Count page faults. */
+  page_fault_cnt++;
+
   struct thread *cur = thread_current();
+
+  /* If memory reference is invalid, or user is accessing kernel memory,
+     or trying to write to read-only page, terminate process and free resources */
+  if (fault_addr == NULL || !is_user_vaddr(fault_addr) || !not_present)
+  {
+    /* Exit status set to -1 when exception causes process to exit. */
+    cur->exit_status = ERROR;
+    sys_exit(ERROR);
+  } 
 
   // 1. Locate page that faulted in SPT
 
   // Getting the page address by rounding fault_addr down to nearest page size multiple
-  void *page_addr = (void *) ((uintptr_t) fault_addr & ~PGMASK);
-
-  /* If memory reference is invalid, or user is accessing kernel memory, 
-     or trying to write to read-only page, terminate process and free resources */
-  if (page_addr == NULL || (is_user_vaddr(page_addr) && !user) || !not_present)
-  {
-    /* Exit status set to -1 when exception causes process to exit. */
-    cur->exit_status = ERROR;
-
-    /* Count page faults. */
-    page_fault_cnt++;
-
-    // TODO: What happens if page fault in kernel?
-    if (user) {
-      sys_exit(ERROR);
-    }
-
-    return;
-  } 
+  void *page_addr = pg_round_down(fault_addr);
  
   // Getting the spt_entry for the page from the supplemental page table
   struct spt_entry *entry = get_spt_entry(&cur->supp_pt, page_addr);
 
-  /* If page should not expect any data, terminate process and free resources */
+  /* If page should not expect any data, check if stack should grow.
+   * If not, terminate process and free resources. */
   if (entry == NULL)
   {
-    /* Exit status set to -1 when exception causes process to exit. */
-    cur->exit_status = ERROR;
-    /* Count page faults. */
-    page_fault_cnt++;
-
-    if (user) {
-      sys_exit(ERROR);
-    }
-    return;
+	  if (should_stack_grow(fault_addr, f->esp)) {
+		  grow_stack(fault_addr);
+	  } else {
+		  cur->exit_status = ERROR;
+		  sys_exit(ERROR);
+	  }
   }
 
 
   // 2. Obtain frame to store the page
 
-  void *page = frame_alloc(PAL_USER, page_addr);
+  void *kpage = frame_alloc(PAL_USER, page_addr);
 
   // 3. Fetch the data into the frame
 
-  // Load data into the page
-  load_into_page(page, entry);
+  if (entry != NULL) {
+	  load_into_page(kpage, entry);
+  }
 
   // 4. Point page table entry for the faulting virtual address to the frame
-
-  entry->frame_addr = page;
+  entry->frame_addr = kpage;
 
 
   // TODO: Delete following lines?
