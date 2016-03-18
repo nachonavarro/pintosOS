@@ -242,6 +242,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
+//    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
   }
 }

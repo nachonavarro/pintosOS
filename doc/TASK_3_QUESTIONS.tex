@@ -167,12 +167,35 @@ struct thread
 
 \item
 
-We created a new \texttt{struct}, \texttt{struct mmap\_mapping}, which will be an entry in the memory map table. The first member of this \texttt{struct} is a \texttt{hash\_elem} so that this \texttt{struct} can be inserted into the memory map table for a thread. The next member of this \texttt{struct} is \texttt{mapid\_t mapid}, which uniquely identifies the mapping within its process. This \texttt{mapid} also acts as the key in the memory map hash table, so it is used to lookup the \texttt{struct mmap\_mapping} that contains it. \texttt{int num\_pages} is simply the number of pages that the mapped file will take up when it is mapped. If the size of the file is not a multiple of \texttt{PGSIZE}, then some bytes on the final page will not be used by the file, but this whole page will still need to be included in \texttt{num\_pages}, since we can't take a fraction of a page. \texttt{num\_pages} is needed in \texttt{sys\_munmap()} so that we know how many pages to remove from the process' list of virtual pages, and so we can write the page back to the file if that file has been written to by the process. The \texttt{start\_uaddr} and \texttt{end\_uaddr} members are the start and end addresses that the file is mapped to, respectively. The \texttt{start\_uaddr} is needed so that we can actually find the start of the file after it has been mapped, such as in \texttt{sys\_munmap} so that we can find the pages to remove from the process' list of virtual pages and write the information in that page back to the file if necessary. The \texttt{end\_uaddr} can be used to work out the length of the file, and is also used to determine how many bytes 'stick out' on the final page, by calculating the \texttt{end\_uaddr} minus the starting address of the last page. Finally, the \texttt{struct file *file} member is the actual file that has been mapped to the memory location. It is used to write certain pages back to \texttt{file} in \texttt{sys\_munmap()}.
+\begin{itemize}
+\item
+We created a new \texttt{struct}, \texttt{struct mmap\_mapping}, which will be an entry in the memory map table. 
+\item
+The first member of this \texttt{struct} is a \texttt{hash\_elem} so that this \texttt{struct} can be inserted into the memory map table for a thread.
+\item
+\texttt{mapid\_t mapid} uniquely identifies the mapping within its process. It's also used to lookup the \texttt{struct mmap\_mapping} that contains it in the mmap hash table. 
+\item
+\texttt{int num\_pages} is simply the number of pages that the mapped file will take up when it is mapped. \texttt{num\_pages} is needed in \texttt{sys\_munmap()} so that we know how many pages to remove from the process' list of virtual pages, and so we can write the page back to the file. 
+\item
+\texttt{start\_uaddr} is needed so that we can actually find the start of the file after it has been mapped, such as in \texttt{sys\_munmap} so that we can find the pages to remove from the process' list of virtual pages and write the page back to file. \texttt{end\_uaddr} can be used to work out the length of the file, and is also used to determine how many bytes 'stick out' on the final page.
+\item
+\texttt{struct file *file} is the actual file that has been mapped to the memory location. It is used to write certain pages back to \texttt{file} in \texttt{sys\_munmap()}.
+
+\end{itemize}
 
 \item
 
-Talk about stuff added to struct thread
+We added 3 members to \texttt{struct thread} for memory mapping. 
 
+\begin{itemize}
+\item
+The first member is \texttt{mmap\_table} - the actual hash table for the memory mappings. This hash table will map \texttt{mapid}'s to \texttt{struct mmap\_mapping}'s.
+\item
+\texttt{mmap\_table\_lock} is required so that we can lock before calling \texttt{hash\_insert()} and \texttt{hash\_delete()}.
+\item
+\texttt{next\_mapid} is the \texttt{mapid} that will be given to the next mapping. It is incremented after each successful mapping, to ensure the uniqueness of a mapping's \texttt{mapid}.
+\end{itemize}
+s
 \end{enumerate}
 
 \subsection{Algorithms}
