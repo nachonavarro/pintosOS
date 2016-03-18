@@ -356,10 +356,9 @@ sys_read(int fd, void *buffer, unsigned size, struct intr_frame *f)
     struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt, buf_iter);
     if (entry == NULL && should_stack_grow(buf_iter, f->esp)) {
         grow_stack(buf_iter); 
+    } else if (entry != NULL) {
     }
   }
-  
-
 
   /* fd = 0 corresponds to reading from stdin. */
   if (fd == STDIN_FILENO) 
