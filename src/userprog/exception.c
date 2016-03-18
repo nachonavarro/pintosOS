@@ -153,9 +153,9 @@ page_fault (struct intr_frame *f)
   {
     /* Exit status set to -1 when exception causes process to exit. */
     cur->exit_status = ERROR;
-    if (fault_addr == NULL) {
-    	printf("INSIDE ERROR \n\n");
-    }
+//    if (fault_addr == NULL) {
+//    	printf("INSIDE ERROR \n\n");
+//    }
     sys_exit(ERROR);
   }
 

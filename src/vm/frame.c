@@ -38,7 +38,6 @@ frame_alloc(enum palloc_flags flags, void *upage) {
      put in the evicted frame). */
   if (frame == NULL) {
     frame = evict(upage);
-    printf("inside frame null\n");
     /* evict() will return NULL if no frame can be evicted without allocating
        a swap slot, and swap slot is full. */
     if (frame == NULL) {
