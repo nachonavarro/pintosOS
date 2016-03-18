@@ -332,6 +332,7 @@ process_exit (void)
     list_remove(&f->file_elem);
     free(f);
   }
+  file_close(cur->exec_file);
 #ifdef VM
 
   /* Frees resources of all entries in the mmap_table, as well as freeing the
@@ -554,6 +555,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
+  thread_current()->exec_file = file;
   success = true;
 
  done:

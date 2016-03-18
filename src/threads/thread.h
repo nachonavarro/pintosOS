@@ -189,6 +189,8 @@ struct thread
                            Initially set to 0. */
 #endif
 
+    struct file *exec_file;
+
     /* Owned by thread.c. */
     unsigned magic;                    /* Detects stack overflow. */
   };

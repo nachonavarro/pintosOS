@@ -11,6 +11,7 @@
 #include "devices/input.h"
 #include "threads/malloc.h"
 #include "lib/string.h"
+#include "vm/page.h"
 
 /* Ensures multiple threads cannot call file system code at the same time. */
 struct lock secure_file;
@@ -23,7 +24,7 @@ static bool sys_create(const char *file, unsigned initial_size);
 static bool sys_remove(const char *file);
 static int sys_open(const char *file);
 static int sys_filesize(int fd);
-static int sys_read(int fd, void *buffer, unsigned size);
+static int sys_read(int fd, void *buffer, unsigned size, struct intr_frame *f);
 static int sys_write(int fd, const void *buffer, unsigned size);
 static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
@@ -121,7 +122,7 @@ syscall_handler (struct intr_frame *f)
       unsigned size = (unsigned)get_word_on_stack(f, 3);
       /* Returns number of bytes actually read, or -1 if it could not
          be read. */
-      f->eax = sys_read(fd, buffer, size);
+      f->eax = sys_read(fd, buffer, size, f);
       break;
     }
     case SYS_WRITE:
@@ -338,18 +339,27 @@ sys_filesize(int fd)
    bytes actually read - 0 at end of file, or -1 if file could not be read.
    fd = 0 reads from the keyboard. */
 static int
-sys_read(int fd, void *buffer, unsigned size) 
+sys_read(int fd, void *buffer, unsigned size, struct intr_frame *f) 
 {
   /* Cannot read from stdout. */
   if (fd == STDOUT_FILENO)
     sys_exit(ERROR);
+  int bytes;
+  void *buf_iter = pg_round_down(buffer);
 
   check_fd(fd);
   check_buffer(buffer, size);
 
-  int bytes;
-
   lock_acquire(&secure_file);
+
+  for (; buf_iter <= buffer + size; buf_iter += PGSIZE) {
+    struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt, buf_iter);
+    if (entry == NULL && should_stack_grow(buf_iter, f->esp)) {
+        grow_stack(buf_iter); 
+    }
+  }
+  
+
 
   /* fd = 0 corresponds to reading from stdin. */
   if (fd == STDIN_FILENO) 
@@ -745,8 +755,7 @@ get_word_on_stack(struct intr_frame *f, int offset)
 static void
 check_mem_ptr(const void *uaddr) 
 {
-  if (uaddr == NULL || !is_user_vaddr(uaddr)
-      || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL)
+  if (uaddr == NULL || !is_user_vaddr(uaddr))
     sys_exit(ERROR);
 }
 

@@ -153,9 +153,6 @@ page_fault (struct intr_frame *f)
   {
     /* Exit status set to -1 when exception causes process to exit. */
     cur->exit_status = ERROR;
-//    if (fault_addr == NULL) {
-//    	printf("INSIDE ERROR \n\n");
-//    }
     sys_exit(ERROR);
   }
 
@@ -170,9 +167,11 @@ page_fault (struct intr_frame *f)
 
   /* If page should not expect any data, check if stack should grow.
    * If not, terminate process and free resources. */
-  
+  //printf("-----------------------------------------\n");
+  //hashtable_debug();
+  //printf("entry->vaddr is: %p \n", entry->vaddr);
   if (entry == NULL){
-	  if (should_stack_grow(fault_addr, f->esp)) {
+    if (should_stack_grow(fault_addr, f->esp)) {
 		  grow_stack(fault_addr);
 	  } else {
 		  cur->exit_status = ERROR;
@@ -205,4 +204,5 @@ page_fault (struct intr_frame *f)
   //         user ? "user" : "kernel");
   //kill (f);
 }
+
 
