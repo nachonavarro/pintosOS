@@ -104,7 +104,8 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   return false;
 }
 
-/* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
+/* Returns the spt_entry from the supplemental_page_table given the virtual
+   address of the page */
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
@@ -112,10 +113,6 @@ get_spt_entry(struct hash *table, void *address)
 	entry.vaddr = address;
 	lock_acquire(&spt_lock);
 	struct hash_elem *elem = hash_find(table, &entry.elem);
-	if (elem == NULL) {
-    lock_release(&spt_lock);
-    return NULL;
-  }
   lock_release(&spt_lock);
 
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
