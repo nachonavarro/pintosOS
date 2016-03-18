@@ -581,27 +581,32 @@ sys_mmap(int fd, void *addr)
   //      the lazy thing??? I thought lazy means only when we try to access
   //      it and page fault, then we check to see if we have it, then try
   //      to load it
+  //      THIS MAY BE WHAT CAUSES THE PAGES TO BE ADDED TO THE PROCESS' LIST OF
+  //      VIRTUAL PAGES!!
 
-  //TODO: Need to file_reopen(file corresponding to fd), then put this in
-  //      the mmap_mapping (i.e. pass it to mmap_table_insert), so that if
-  //      sys_close(fd) is called, any mappings are still valid
-  //      (they are valid until process exits or munmap is called).
-  //      (REMEMBER, the mmap'ed files don't have fd's - the struct file *file
-  //      member of mmap_mapping will 'do this job'). I think this struct file *file
-  //      will also help us evict and write back to file it was mapped from.
-  //      ACQUIRE SECURE LOCK TO DO FILE_REOPEN!!!!!1
   lock_acquire(&secure_file);
-//  struct file *old_file = get_file_by_fd(fd);
-  struct file *old_file = NULL;
+  struct file *old_file = get_file(fd);
+  if (!old_file) {
+    lock_release(&secure_file);
+    sys_exit(ERROR);
+  }
+  /* Must use file_reopen() to get independent 'struct file *' for same file
+     (with same inode) because the file could be being read at different points
+     (file->pos could be different) and they could have different
+     file->deny_write (file_deny_write() could be called on one struct file but
+     not another of same file (inode) but different struct file). */
   struct file *file = file_reopen(old_file);
   lock_release(&secure_file);
 
   struct thread *cur = thread_current();
+
   mapid_t mapid = cur->next_mapid;
-  /* Lock must be acquired to call hash_insert, and since we have
-     thread_current() here alreadym it makes sense to lock here too. */
+
+  /* Lock must be acquired to call hash_insert() in mmap_table_insert(), and
+     since we have thread_current() here already it makes sense to lock here
+     rather than in mmap_table_insert() in mmap.c. */
   lock_acquire(&cur->mmap_table_lock);
-  bool success = mmap_table_insert(&cur->mmap_table, addr, size, mapid, file);
+  bool success = mmap_table_insert(&cur->mmap_table, addr, addr + size, pages, mapid, file);
   lock_release(&cur->mmap_table_lock);
 
   /* Return -1 if mmap_table_insert wasn't successful (meaning there isn't
@@ -611,7 +616,10 @@ sys_mmap(int fd, void *addr)
   }
 
   /* Increment next_mapid for this thread, so that the next mmap will have a
-     different mapid, ensuring unique mapids for all mappings for a process. */
+     different mapid, ensuring unique mapids for all mappings for a process.
+     Increment after checking for mmap_table_insert() success status, because
+     in the case of failure, we can reuse the mapid that the failed mapping
+     would have had. */
   cur->next_mapid++;
 
   /* If successful, function returns the mapid that uniquely identifies
@@ -619,10 +627,78 @@ sys_mmap(int fd, void *addr)
   return mapid;
 }
 
-static void
-sys_munmap(mapid_t mapping UNUSED)
-{
+//TODO: Delete this comment.
+/* ***STEPS IN A MUNMAP***
+ *
+ * *Each pages written to need to be written back to file (Dirty bit!)
+ *
+ * *Remove each page from spt
+ *
+ * *hash_delete() and free(struct mmap_mapping) (in mmap_mapping_delete, but
+ *  this needs to be changed, because we now need to mmap_mapping_lookup in
+ *  sys_munmap)                                                              */
 
+/* Unmaps the mapping for current thread with mapid MAPPING. Each page that
+   has been wriiten to by the process needs to be written back to the file.
+   Each page must be removed from the process' list of virtual pages. */
+static void
+sys_munmap(mapid_t mapping)
+{
+  struct thread *cur = thread_current();
+  struct hash *spt = &cur->supp_pt;
+  struct hash *mmap_table = &cur->mmap_table;
+  struct mmap_mapping *mmap = mmap_mapping_lookup(mmap_table, mapping);
+
+  /* MAPPING must be a mapping ID returned by a previous call to sys_mmap() by
+     the same process that has not yet been unmapped. */
+  if (mmap == NULL) {
+    sys_exit(ERROR);
+  }
+
+  void *page_uaddr = mmap->start_uaddr;
+  int num_pages = mmap->num_pages;
+  uint32_t *pd = cur->pagedir;
+  struct file *file = mmap->file;
+
+  int bytes_to_write;
+  int i;
+
+  /* Need to remove each page from the process' list of virtual pages
+     (Supplemental page table). Also, each page that has been written to by the
+     process must be written back to the file. */
+  for (i = 0; i < num_pages; i++) {
+    /* If dirty bit is set for this page, it has been written to. */
+    if (pagedir_is_dirty(pd, page_uaddr)) {
+
+      /* If we are on the last page, we don't want to write the last bytes on
+         this page (that 'stick out' beyond the end of file) back to the file.
+         This happens when file's length is not a multiple of PGSIZE, but even
+         in the case where the file size is a multiple of PGSIZE, both
+         outcomes of the below statement will set bytes_to_read to PGSIZE
+         (Because then end_uaddr - page_uaddr = PGSIZE). */
+      bytes_to_write = (i == (num_pages - 1)) ? (mmap->end_uaddr - page_uaddr)
+                                              : PGSIZE;
+
+      /* Must acquire lock when calling file system code. */
+      lock_acquire(&secure_file);
+      /* Ensure we write to correct position in file by using file_seek. */
+      file_seek(file, ((off_t) page_uaddr) - mmap->num_pages);
+      /* Write this page back to the file, as this page has been written to. */
+      file_write(file, page_uaddr, bytes_to_write);
+      lock_release(&secure_file);
+    }
+
+    //TODO: spt_remove(page from spt)
+
+    /* Advance to the next page. */
+    page_uaddr += PGSIZE;
+  }
+
+  /* Lock must be acquired to call hash_delete() in mmap_mapping_delete(). */
+  lock_acquire(&cur->mmap_table_lock);
+  /* Remove the mapping MMAP from MMAP_TABLE and free MMAP. */
+  mmap_mapping_delete(mmap_table, mmap);
+  lock_release(&cur->mmap_table_lock);
 }
 
 /* Returns the file corresponding the to supplied file descriptor

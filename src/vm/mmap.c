@@ -14,14 +14,16 @@ static void free_using_hash_elem(struct hash_elem *, void*);
    before inserting it into mmap_table. Returns false if not enough
    space to malloc. */
 bool
-mmap_table_insert(struct hash *mmap_table, void *uaddr, int size, mapid_t mapid, struct file *file) {
+mmap_table_insert(struct hash *mmap_table, void *start_uaddr, void *end_uaddr,
+    int num_pages, mapid_t mapid, struct file *file) {
   /* Freed in mmap_mapping_delete(). */
   struct mmap_mapping *mmap = malloc(sizeof(struct mmap_mapping));
   if (mmap == NULL) {
     return false;
   }
-  mmap->uaddr = uaddr;
-  mmap->size = size;
+  mmap->start_uaddr = start_uaddr;
+  mmap->end_uaddr = end_uaddr;
+  mmap->num_pages = num_pages;
   mmap->mapid = mapid;
   mmap->file = file;
 //  lock_acquire(&mmap_table_lock);
@@ -44,18 +46,11 @@ mmap_mapping_lookup(struct hash *mmap_table, const mapid_t mapid) {
   return e != NULL ? hash_entry(e, struct mmap_mapping, hash_elem) : NULL;
 }
 
-/* Remove the mapping in mmap_table from MAPID to the corresponding struct
-   mmap_mapping. */
+/* Remove the mapping MMAP from MMAP_TABLE. Should guarantee that MMAP is in
+   MMAP_TABLE before calling this, by calling mmap_mapping_lookup first. */
 void
-mmap_mapping_delete(struct hash *mmap_table, const mapid_t mapid) {
-  struct mmap_mapping *mmap = mmap_mapping_lookup(mmap_table, mapid);
-  /* If no element with mapid_t MAPID is in mmap_table, then simply return. */
-  if (mmap == NULL) {
-    return;
-  }
-//  lock_acquire(&mmap_table_lock);
+mmap_mapping_delete(struct hash *mmap_table, struct mmap_mapping *mmap) {
   hash_delete(mmap_table, &mmap->hash_elem);
-//  lock_release(&mmap_table_lock);
   /* Free the struct mmap_mapping allocated using malloc in
      mmap_table_insert(). */
   free(mmap);

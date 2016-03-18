@@ -177,17 +177,16 @@ struct thread
                                      file is opened. */
 
 #ifdef VM
+    struct hash supp_pt; /* Hash map of virtual addresses to
+                                additional information */
     /* Memory mapping members. */
     struct hash mmap_table; /* Mapping between mapid_t and struct mmap_mapping. */
     struct lock mmap_table_lock; /* Acquired/released before/after calling
                                     hash_insert()/hash_delete() on this
                                     threads mmap_table. */
-    //TODO: Increment in mmap.c or syscall.c? (Doesn't really matter, I think mmap.c would be better..)
     mapid_t next_mapid; /* Next mmap mapping for this thread will take this as its
                            mapid. Incremented after a new mapping is added.
                            Initially set to 0. */
-    struct hash supp_pt; /* Hash map of virtual addresses to
-                            additional information */
 #endif
 
     /* Owned by thread.c. */
