@@ -34,7 +34,8 @@ struct spt_entry {
 
 void spt_init(struct hash *spt);
 bool spt_insert(struct hash *spt, struct spt_entry *entry);
-bool spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset);
+bool spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros,
+                     size_t offset, bool mmap);
 bool spt_insert_all_zero(void *uaddr);
 struct spt_entry* get_spt_entry(struct hash *table, void *address);
 void spt_destroy(struct hash *hashmap);

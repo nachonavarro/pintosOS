@@ -579,24 +579,6 @@ sys_mmap(int fd, void *addr)
   struct thread *cur = thread_current();
   struct hash *mmap_table = &cur->mmap_table;
 
-  /* Check that the contiguous range of pages to be mapped doesn't overlap
-     any existing set of mapped pages (Not including stack). */
-  int i;
-  for (i = 0; i < pages; i++) {
-    /* Check to see if there is an existing mapped page at what would be the
-       i'th page of this mapped file. */
-    if (get_spt_entry(mmap_table, ((uint8_t *) addr) + (i * PGSIZE)) == NULL) {
-      return ERROR;
-    }
-  }
-
-  //TODO: Insert all new pages into supplementary page table???? Is this
-  //      the lazy thing??? I thought lazy means only when we try to access
-  //      it and page fault, then we check to see if we have it, then try
-  //      to load it
-  //      THIS MAY BE WHAT CAUSES THE PAGES TO BE ADDED TO THE PROCESS' LIST OF
-  //      VIRTUAL PAGES!!
-
   lock_acquire(&secure_file);
   struct file *old_file = get_file(fd);
   if (!old_file) {
@@ -610,6 +592,27 @@ sys_mmap(int fd, void *addr)
      not another of same file (inode) but different struct file). */
   struct file *file = file_reopen(old_file);
   lock_release(&secure_file);
+
+  int i;
+  int bytes_to_write;
+  void *cur_page;
+  /* Check that the contiguous range of pages to be mapped doesn't overlap
+     any existing set of mapped pages (Not including stack). Can then add
+     these pages to the supplementary page table. */
+  for (i = 0; i < pages; i++) {
+    cur_page = (void *) ((uint8_t *) addr) + (i * PGSIZE);
+    /* Check to see if there is an existing mapped page at what would be the
+       i'th page of this mapped file. */
+    if (get_spt_entry(mmap_table, cur_page) != NULL) { //TODO: Pretty sure this should be != NULL, but when it was == NULL, some more tests fail, but some more pass (I think) - double check this please
+      return ERROR;
+    }
+    /* Only on the last page do we potentially not fill up whole page with
+       part of file. */
+    bytes_to_write = (i == (pages - 1)) ? (size % PGSIZE) : PGSIZE;
+    /* Add current page to the supplementary page table. */
+    spt_insert_file(cur_page, file, bytes_to_write,
+                          PGSIZE - bytes_to_write, i * PGSIZE, true);
+  }
 
   mapid_t mapid = cur->next_mapid;
 
@@ -699,7 +702,11 @@ sys_munmap(mapid_t mapping)
       lock_release(&secure_file);
     }
 
-    //TODO: spt_remove(page from spt)
+    //TODO: Change this to spt_remove(page from spt), so free() is called on
+    //      appropriate stuff and better abstraction - Just waiting for this
+    //      function to be implemented.
+    struct spt_entry *entry = get_spt_entry(spt, page_uaddr);
+    hash_delete(spt, &entry->elem);
 
     /* Advance to the next page. */
     page_uaddr += PGSIZE;

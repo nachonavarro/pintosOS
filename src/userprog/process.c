@@ -650,7 +650,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false;
         }
       } else {
-          if (!spt_insert_file(upage,file, page_read_bytes, page_zero_bytes, offset)) {
+          if (!spt_insert_file(upage,file, page_read_bytes, page_zero_bytes, offset, false)) {
             return false; 
           }
       }

@@ -82,9 +82,10 @@ spt_insert_all_zero(void *uaddr)
   return false;
 }
 
-
+/* Used to insert an FSYS or a MMAP file into the supplementary page table.
+   If MMAP bool is true, it is MMAP we are inserting, otherwise it is FSYS. */
 bool
-spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset)
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset, bool mmap)
 {
 
   struct thread *cur = thread_current();
@@ -98,7 +99,7 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   entry->file_info.offset = offset;
   entry->file_info.size = size;
   entry->file_info.zeros = zeros;
-  entry->info = FSYS;
+  entry->info = mmap ? MMAP : FSYS;
   entry->vaddr = uaddr;
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
   if (elem == NULL) {
@@ -109,7 +110,8 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   return false;
 }
 
-/* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
+/* Returns the spt_entry from the supplemental_page_table given the virtual
+   address of the page */
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
