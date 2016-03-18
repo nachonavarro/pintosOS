@@ -184,14 +184,13 @@ page_fault (struct intr_frame *f)
 
   void *kpage = frame_alloc(PAL_USER | PAL_ZERO, page_addr);
 
-
   // 3. Fetch the data into the frame
   if (entry != NULL) {
+    entry->frame_addr = kpage;
 	  load_into_page(kpage, entry);
   }
 
   // 4. Point page table entry for the faulting virtual address to the frame
-  entry->frame_addr = kpage;
 
 
   // TODO: Delete following lines?

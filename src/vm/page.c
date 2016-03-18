@@ -193,7 +193,6 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
-  frame_free(entry->frame_addr);
   free(entry);
 }
 
