@@ -113,7 +113,7 @@ get_spt_entry(struct hash *table, void *address)
 	struct hash_elem *elem = hash_find(table, &entry.elem);
 	lock_release(&spt_lock);
 
-	return hash_entry(elem, struct spt_entry, elem);
+	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
 // TODO: Do we want to delete from hash table after swapping out?

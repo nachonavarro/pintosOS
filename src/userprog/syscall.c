@@ -158,7 +158,7 @@ syscall_handler (struct intr_frame *f)
     {
         int fd     = (int)get_word_on_stack(f, 1);
         void *addr = (void *)get_word_on_stack(f, 2);
-        //f->eax = sys_mmap(fd, addr);
+        f->eax = sys_mmap(fd, addr);
         break;
     }
     case SYS_MUNMAP:
@@ -567,14 +567,18 @@ sys_mmap(int fd, void *addr)
     pages++;
   }
 
-  //TODO: Use supplemental page table, potentially, to check if pages needed
-  //      overlaps any existing mapped pages
+  struct thread *cur = thread_current();
+  struct hash *mmap_table = &cur->mmap_table;
+
   /* Check that the contiguous range of pages to be mapped doesn't overlap
      any existing set of mapped pages (Not including stack). */
   int i;
   for (i = 0; i < pages; i++) {
-    //TODO: Check addr + (i * PGSIZE) in supplementary page table here?
-    //      Return false if any entry in this table exists
+    /* Check to see if there is an existing mapped page at what would be the
+       i'th page of this mapped file. */
+    if (get_spt_entry(mmap_table, ((uint8_t *) addr) + (i * PGSIZE)) == NULL) {
+      return ERROR;
+    }
   }
 
   //TODO: Insert all new pages into supplementary page table???? Is this
@@ -598,15 +602,13 @@ sys_mmap(int fd, void *addr)
   struct file *file = file_reopen(old_file);
   lock_release(&secure_file);
 
-  struct thread *cur = thread_current();
-
   mapid_t mapid = cur->next_mapid;
 
   /* Lock must be acquired to call hash_insert() in mmap_table_insert(), and
      since we have thread_current() here already it makes sense to lock here
      rather than in mmap_table_insert() in mmap.c. */
   lock_acquire(&cur->mmap_table_lock);
-  bool success = mmap_table_insert(&cur->mmap_table, addr, addr + size, pages, mapid, file);
+  bool success = mmap_table_insert(mmap_table, addr, addr + size, pages, mapid, file);
   lock_release(&cur->mmap_table_lock);
 
   /* Return -1 if mmap_table_insert wasn't successful (meaning there isn't
