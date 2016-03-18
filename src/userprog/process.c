@@ -563,7 +563,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
+bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -631,10 +631,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
-  printf("read: %d, zero: %d\n", read_bytes, zero_bytes);
 
   off_t offset = ofs;
-  printf("TOTAL BYTES= %d\n", read_bytes + zero_bytes);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -649,14 +647,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         if (!spt_insert_all_zero(upage)) {
           return false;
         }
-      } else if (page_read_bytes == PGSIZE) {
-          if (!spt_insert_file(upage,file, page_read_bytes, offset)) {
+      } else {
+          if (!spt_insert_file(upage,file, page_read_bytes, page_zero_bytes, offset)) {
             return false; 
           }
       }
-      printf("page_read_bytes is %d\n", page_read_bytes);
-      printf("zeros %d\n", page_zero_bytes);
-      printf("offset is %d\n", offset);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -708,7 +703,7 @@ setup_stack (void **esp)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();

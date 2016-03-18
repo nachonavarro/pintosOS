@@ -78,7 +78,7 @@ spt_insert_all_zero(void *uaddr)
 
 
 bool
-spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset)
 {
 
   struct thread *cur = thread_current();
@@ -89,9 +89,9 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
 	  return false;
   }
   entry->file_info.f = f;
-  printf("FILE IS %p\n", f);
   entry->file_info.offset = offset;
   entry->file_info.size = size;
+  entry->file_info.zeros = zeros;
   entry->info = FSYS;
   entry->vaddr = uaddr;
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
@@ -99,8 +99,6 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
 	  lock_release(&spt_lock);
 	  return true;
   }
-  printf("%s\n\n", cur->name);
-
   lock_release(&spt_lock);
   return false;
 }
@@ -129,14 +127,10 @@ load_from_disk(void *page, struct spt_entry *spt_entry)
 void
 load_file(void *kpage, struct spt_entry *entry)
 {
-	printf("IN LOAD_FILE");
 	struct thread *cur = thread_current();
 	size_t page_read_bytes = entry->file_info.size;
 
 	/*Same as segment loop in exception.c*/
-  printf("file pointer is %p\n", entry->file_info.f);
-  printf("page_read_bytes is: %d\n", page_read_bytes);
-  printf("offset is: %d\n\n\n\n\n", entry->file_info.offset);
   size_t bytes_actually_read = file_read_at(entry->file_info.f, 
                                   kpage, page_read_bytes, entry->file_info.offset);
 	if (bytes_actually_read != page_read_bytes)
@@ -145,10 +139,9 @@ load_file(void *kpage, struct spt_entry *entry)
 		  return;
 	  }
 	// Should we keep a variable zero in file_info?
-  ASSERT(PGSIZE >= page_read_bytes);
-	memset(kpage + page_read_bytes, 0, PGSIZE - page_read_bytes);
+	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
-	bool success = pagedir_set_page(cur->pagedir, entry->vaddr, kpage, true);
+	bool success = install_page(entry->vaddr, kpage, true);
   if (!success) {
     frame_free(kpage);
   }
@@ -167,6 +160,7 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
 {
   // TODO: Use memcpy from file system, swap slot, or zero the page?
   // If page data is in swap slot, swap out, into the frame
+  
   if (spt_entry->info == SWAP) {
     load_from_disk(page, spt_entry);
 
@@ -181,6 +175,7 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
   // If page should be all-zero, fill it with zeroes
   } else if (spt_entry->info == ALL_ZERO){
   	memset(page, 0, PGSIZE);
+    install_page(spt_entry->vaddr, page, true);
   }
 }
 
@@ -198,7 +193,6 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
-  frame_free(entry->frame_addr);
   free(entry);
 }
 
@@ -233,7 +227,7 @@ void hashtable_debug(void)
   {
     struct spt_entry *entry = hash_entry(hash_cur (&i), struct spt_entry, elem);
 
-    char *type = NULL, *extras = NULL;
+    char *type = NULL;
     enum page_info status = entry->info;
     if (status == FSYS)
       type = "filesys";
