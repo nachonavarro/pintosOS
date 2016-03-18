@@ -682,7 +682,7 @@ sys_munmap(mapid_t mapping)
       /* Must acquire lock when calling file system code. */
       lock_acquire(&secure_file);
       /* Ensure we write to correct position in file by using file_seek. */
-      file_seek(file, ((off_t) page_uaddr) - mmap->num_pages);
+      file_seek(file, ((off_t) page_uaddr) - mmap->start_uaddr);
       /* Write this page back to the file, as this page has been written to. */
       file_write(file, page_uaddr, bytes_to_write);
       lock_release(&secure_file);

@@ -118,6 +118,62 @@
 \subsection{Data Structures}
 
 \subsubsection{Purpose of File Mapping Table Data Structures}
+\begin{enumerate}
+
+\item
+
+\begin{lstlisting}
+/* The memory map table will be a hash table mapping a mapid_t to a
+   struct mmap_mapping. */
+struct mmap_mapping {
+  struct hash_elem hash_elem;
+  mapid_t mapid; /* Uniquely identifies the mapping (within the process). The
+                    hash table mmap_table will take mapid as a key, and the
+                    struct mmap_mapping it is in will be the value. */
+  int num_pages; /* Number of pages that this file will take up when mapped.
+                    If end file is just 1 byte into a page, that whole page is
+                    needed. */
+  void *start_uaddr; /* Start address that file is mapped to. */
+  void *end_uaddr; /* End address that file is mapped to. */
+  struct file *file; /* File that is mapped. Not the same struct as in
+                        another mmap_mapping for same file, as
+                        file_reopen() is used. */
+};
+\end{lstlisting}
+
+\item
+
+\begin{lstlisting}
+struct thread 
+ {
+    .
+    .
+    /* Memory mapping members. */
+    struct hash mmap_table; /* Mapping between mapid_t and struct mmap_mapping. */
+    struct lock mmap_table_lock; /* Acquired/released before/after calling
+                                    hash_insert()/hash_delete() on this
+                                    threads mmap_table. */
+    mapid_t next_mapid; /* Next mmap mapping for this thread will take this as its
+                           mapid. Incremented after a new mapping is added.
+                           Initially set to 0. */
+    .
+    .
+ };
+\end{lstlisting}
+
+\end{enumerate}
+
+\begin{enumerate}
+
+\item
+
+We created a new \texttt{struct}, \texttt{struct mmap\_mapping}, which will be an entry in the memory map table. The first member of this \texttt{struct} is a \texttt{hash\_elem} so that this \texttt{struct} can be inserted into the memory map table for a thread. The next member of this \texttt{struct} is \texttt{mapid\_t mapid}, which uniquely identifies the mapping within its process. This \texttt{mapid} also acts as the key in the memory map hash table, so it is used to lookup the \texttt{struct mmap\_mapping} that contains it. \texttt{int num\_pages} is simply the number of pages that the mapped file will take up when it is mapped. If the size of the file is not a multiple of \texttt{PGSIZE}, then some bytes on the final page will not be used by the file, but this whole page will still need to be included in \texttt{num\_pages}, since we can't take a fraction of a page. \texttt{num\_pages} is needed in \texttt{sys\_munmap()} so that we know how many pages to remove from the process' list of virtual pages, and so we can write the page back to the file if that file has been written to by the process. The \texttt{start\_uaddr} and \texttt{end\_uaddr} members are the start and end addresses that the file is mapped to, respectively. The \texttt{start\_uaddr} is needed so that we can actually find the start of the file after it has been mapped, such as in \texttt{sys\_munmap} so that we can find the pages to remove from the process' list of virtual pages and write the information in that page back to the file if necessary. The \texttt{end\_uaddr} can be used to work out the length of the file, and is also used to determine how many bytes 'stick out' on the final page, by calculating the \texttt{end\_uaddr} minus the starting address of the last page. Finally, the \texttt{struct file *file} member is the actual file that has been mapped to the memory location. It is used to write certain pages back to \texttt{file} in \texttt{sys\_munmap()}.
+
+\item
+
+Talk about stuff added to struct thread
+
+\end{enumerate}
 
 \subsection{Algorithms}
 
