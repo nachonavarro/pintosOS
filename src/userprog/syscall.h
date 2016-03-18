@@ -3,6 +3,7 @@
 
 #include <list.h>
 #include "filesys/file.h"
+#include "lib/kernel/hash.h"
 
 /* Process identifier. */
 typedef int pid_t;
@@ -28,5 +29,6 @@ struct proc_file {
 
 void syscall_init (void);
 void sys_exit (int status);
+void munmap_from_hash_elem(struct hash_elem *, void *);
 
 #endif /* userprog/syscall.h */

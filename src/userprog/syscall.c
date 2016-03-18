@@ -701,6 +701,12 @@ sys_munmap(mapid_t mapping)
   lock_release(&cur->mmap_table_lock);
 }
 
+void
+munmap_from_hash_elem(struct hash_elem *e, void *aux UNUSED) {
+  struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
+  sys_munmap(mmap->mapid);
+}
+
 /* Returns the file corresponding the to supplied file descriptor
    in the current thread's list of files that it can see. */
 static struct file*

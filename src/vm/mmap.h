@@ -32,6 +32,5 @@ struct mmap_mapping *mmap_mapping_lookup(struct hash *mmap_table,
 void mmap_mapping_delete(struct hash *mmap_table, struct mmap_mapping *mmap);
 unsigned mapid_hash(const struct hash_elem *, void *);
 bool mapid_less(const struct hash_elem *, const struct hash_elem *, void *);
-void destroy_mmap_table(struct hash *mmap_table);
 
 #endif /* vm/mmap.h */
