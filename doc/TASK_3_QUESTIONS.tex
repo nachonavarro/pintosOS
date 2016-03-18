@@ -195,7 +195,7 @@ The first member is \texttt{mmap\_table} - the actual hash table for the memory 
 \item
 \texttt{next\_mapid} is the \texttt{mapid} that will be given to the next mapping. It is incremented after each successful mapping, to ensure the uniqueness of a mapping's \texttt{mapid}.
 \end{itemize}
-s
+
 \end{enumerate}
 
 \subsection{Algorithms}
@@ -203,6 +203,8 @@ s
 \subsubsection{Integrating Memory Mapped Files into Virtual Memory Subsystem}
 
 \subsubsection{Overlapping File Mapping}
+
+In \texttt{sys\_mmap()}, the number of pages that the file will have to be mapped to is calculated by doing \texttt{int pages = size / PGSIZE}, where \texttt{size} is the size in bytes of the file. However, since this is integer division, if \texttt{size} is not a multiple of \texttt{PGSIZE}, the final page won't be counted in \texttt{pages}. To fix this, we check to see if \texttt{size} is a multiple of \texttt{PGSIZE} using \texttt{size \% PGSIZE}. If this equals 0, then we can increment \texttt{pages} so that it is now correct. We then use a for loop, \texttt{for (i = 0; i < pages; i++)}, to check that no page in the file mapping overlaps with any existing segment. In this for loop, we use \texttt{get\_spt\_entry()} to check if this thread's supplementary page table has an entry for this page, which will be \texttt{((uint8\_t *) addr) + (i * PGSIZE))}, where \texttt{addr} is the address of the first page to be mapped to (this is the second argument to the \texttt{mmap} system call. If this function returns \texttt{NULL}, then there is an overlap, and we can return -1 from \texttt{sys\_mmap()}.
 
 \subsection{Rationale}
 
