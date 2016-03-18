@@ -5,6 +5,7 @@
 #include "vm/swap.h"
 #include "userprog/pagedir.h"
 #include "threads/malloc.h"
+#include "threads/interrupt.h"
 
 static struct lock spt_lock;
 
@@ -35,10 +36,10 @@ compare_less_hash (const struct hash_elem *a,
                    void *aux UNUSED)
 {
   struct spt_entry *supp_page_table_a = hash_entry(a, struct spt_entry, elem);
-  uint32_t vaddr_a = (uint32_t) supp_page_table_a->vaddr;
+  uint32_t vaddr_a = supp_page_table_a->vaddr;
 
   struct spt_entry *supp_page_table_b = hash_entry(b, struct spt_entry, elem);
-  uint32_t vaddr_b = (uint32_t) supp_page_table_b->vaddr;
+  uint32_t vaddr_b = supp_page_table_b->vaddr;
 
   return vaddr_a <= vaddr_b;
 }
@@ -51,52 +52,49 @@ spt_insert(struct hash *spt, struct spt_entry *entry)
   struct hash_elem *elem;
   lock_acquire(&spt_lock);
   elem = hash_insert(spt, &entry->elem);
-
-  if (elem != NULL)
-    hash_replace(spt, &entry->elem);
-
   lock_release(&spt_lock);
 }
 
-void
-spt_insert_file(struct file *f, size_t size, size_t offset)
+bool
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
 {
-  struct thread *cur = thread_current();
-  struct spt_entry *entry;
-  struct hash_elem *elem;
-  lock_acquire(&spt_lock);
-  struct file_info *f_info = malloc(sizeof(struct file_info)); // WE NEED TO FREEEE.
-  f_info->f = f;
-  f_info->offset = offset;
-  f_info->size = size;
-  entry->file_info = f_info;
-  entry->info = FSYS;
 
-  elem = hash_insert(&cur->supp_pt, &entry->elem);
-  if (elem != NULL)
-    hash_replace(&cur->supp_pt, &entry->elem);
+  struct thread *cur = thread_current();
+  struct hash_elem *elem;
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREEEE.
+  lock_acquire(&spt_lock);
+  if (entry == NULL) {
+	  return false;
+  }
+  entry->file_info.f = f;
+  entry->file_info.offset = offset;
+  entry->file_info.size = size;
+  entry->info = FSYS;
+  entry->vaddr = uaddr;
+  elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
+  if (elem == NULL) {
+	  lock_release(&spt_lock);
+	  return true;
+  }
+  printf("%s\n\n", cur->name);
 
   lock_release(&spt_lock);
+  return false;
 }
 
 /* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
+	struct spt_entry entry;
+	entry.vaddr = address;
+	lock_acquire(&spt_lock);
+	struct hash_elem *elem = hash_find(table, &entry.elem);
+	lock_release(&spt_lock);
 
-  // TODO: Replace palloc_get_page with frame_alloc?
-
-	struct spt_entry *entry;
-
-	entry->vaddr = address;
-  lock_acquire(&spt_lock);
-	struct hash_elem *hash_elem = hash_find(table, &entry->elem);
-  lock_release(&spt_lock);
-
-  if (hash_elem == NULL)
-    return NULL;
-
-	return hash_entry(hash_elem, struct spt_entry, elem);
+	if (elem == NULL)
+		return NULL;
+	return hash_entry(elem, struct spt_entry, elem);
 }
 
 // TODO: Do we want to delete from hash table after swapping out?
@@ -110,12 +108,13 @@ load_from_disk(void *page, struct spt_entry *spt_entry)
 void
 load_file(void *kpage, struct spt_entry *entry)
 {
+	printf("IN LOAD_FILE");
 	struct thread *cur = thread_current();
-	struct file_info *f_info = entry->file_info;
-	size_t page_read_bytes = f_info->size;
+	size_t page_read_bytes = entry->file_info.size;
+	file_seek(entry->file_info.f, entry->file_info.offset);
 
 	/*Same as segment loop in exception.c*/
-	if (file_read (f_info->f, kpage, page_read_bytes) != (int) page_read_bytes)
+	if (file_read (entry->file_info.f, kpage, page_read_bytes) != (int) page_read_bytes)
 		{
 		  frame_free(kpage);
 		  return;
@@ -129,7 +128,7 @@ load_file(void *kpage, struct spt_entry *entry)
 }
 
 void
-load_mmf(void *page, struct spt_entry *entry)
+load_mmf(void *page UNUSED, struct spt_entry *entry UNUSED)
 {
     return;
 }
@@ -170,7 +169,7 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
-  palloc_free_page(entry);
+  free(entry);
 }
 
 /* The heuristic to check if stack should grow. */
@@ -193,5 +192,28 @@ grow_stack(void *addr)
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }
 
+void print_page_info(void)
+{
+  struct hash *supplemental_page_table = &thread_current()->supp_pt;
 
+  struct hash_iterator i;
+  hash_first (&i, supplemental_page_table);
 
+  while (hash_next (&i))
+  {
+    struct spt_entry *entry = hash_entry(hash_cur (&i), struct spt_entry, elem);
+
+    char *type = NULL, *extras = NULL;
+    enum page_info status = entry->info;
+    if (status == FSYS)
+      type = "filesys";
+    if (status == MMAP)
+      type = "memory-mapped";
+    if (status == ALL_ZERO)
+      type = "zero";
+    if (status == SWAP)
+      type = "swap";
+
+    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
+  }
+}

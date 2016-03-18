@@ -153,8 +153,13 @@ page_fault (struct intr_frame *f)
   {
     /* Exit status set to -1 when exception causes process to exit. */
     cur->exit_status = ERROR;
+    if (fault_addr == NULL) {
+    	print_page_info();
+    	printf("INSIDE ERROR \n\n");
+    }
     sys_exit(ERROR);
-  } 
+  }
+
 
   // 1. Locate page that faulted in SPT
 
@@ -176,14 +181,13 @@ page_fault (struct intr_frame *f)
 	  }
   }
 
-
   // 2. Obtain frame to store the page
 
   void *kpage = frame_alloc(PAL_USER, page_addr);
 
   // 3. Fetch the data into the frame
-
   if (entry != NULL) {
+	  printf("HEEEEEEEEEEEEEEEEEELLLLLLLLLLLLLL");
 	  load_into_page(kpage, entry);
   }
 
