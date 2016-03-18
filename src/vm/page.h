@@ -44,7 +44,7 @@ void load_mmf(void *page, struct spt_entry *entry);
 
 bool should_stack_grow(void *uaddr, void *esp);
 void grow_stack(void *addr);
-void print_page_info(void);
+void hashtable_debug(void);
 
 
 // void spt_modify(struct hash *spt, struct spt_entry *entry)

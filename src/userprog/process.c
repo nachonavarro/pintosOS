@@ -634,6 +634,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  off_t offset = ofs;
+  printf("TOTAL BYTES= %d\n", read_bytes + zero_bytes);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -647,7 +649,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
       //!spt_insert_file(upage, kpage, file, read_bytes, ofs))
       //printf("userpage is %p\n", upage);
-      if (!spt_insert_file(upage, file, read_bytes, ofs))
+      if (!spt_insert_file(upage, file, page_read_bytes, offset))
         {
           printf("COULDNT INSERT FILE\n\n");
           return false; 
@@ -657,6 +659,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      offset += PGSIZE;
     }
   return true;
 }
@@ -678,7 +681,7 @@ setup_stack (void **esp)
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
   entry->frame_addr = kpage;
   entry->vaddr = upage;
-  entry->info = SWAP;
+  entry->info = ALL_ZERO;
   spt_insert(&thread_current()->supp_pt, entry);
   if (kpage != NULL) 
     {
