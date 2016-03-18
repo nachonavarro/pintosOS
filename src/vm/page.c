@@ -43,15 +43,21 @@ compare_less_hash (const struct hash_elem *a,
   return entry_a->vaddr < entry_b->vaddr;
 }
 
-/* Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
-   If the entry already exists, replaces it with its new value. */
-void
+// Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
+
+bool
 spt_insert(struct hash *spt, struct spt_entry *entry)
 {
   struct hash_elem *elem;
   lock_acquire(&spt_lock);
   elem = hash_insert(spt, &entry->elem);
+  if (elem == NULL) {
+    lock_release(&spt_lock);
+    return true;
+  }
   lock_release(&spt_lock);
+  return false;
+
 }
 
 bool
@@ -60,7 +66,7 @@ spt_insert_all_zero(void *uaddr)
 
   struct thread *cur = thread_current();
   struct hash_elem *elem;
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREEEE.
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREE.
   lock_acquire(&spt_lock);
   if (entry == NULL) {
 	  return false;
@@ -111,12 +117,8 @@ get_spt_entry(struct hash *table, void *address)
 	entry.vaddr = address;
 	lock_acquire(&spt_lock);
 	struct hash_elem *elem = hash_find(table, &entry.elem);
-	if (elem == NULL) {
-    lock_release(&spt_lock);
-    return NULL;
-  }
   lock_release(&spt_lock);
-
+  
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
