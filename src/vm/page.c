@@ -6,6 +6,8 @@
 #include "userprog/pagedir.h"
 #include "threads/malloc.h"
 #include "threads/interrupt.h"
+#include <string.h>
+
 
 static struct lock spt_lock;
 
@@ -53,6 +55,29 @@ spt_insert(struct hash *spt, struct spt_entry *entry)
 }
 
 bool
+spt_insert_all_zero(void *uaddr)
+{
+
+  struct thread *cur = thread_current();
+  struct hash_elem *elem;
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREEEE.
+  lock_acquire(&spt_lock);
+  if (entry == NULL) {
+	  return false;
+  }
+  entry->info = ALL_ZERO;
+  entry->vaddr = uaddr;
+  elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
+  if (elem == NULL) {
+	  lock_release(&spt_lock);
+	  return true;
+  }
+  lock_release(&spt_lock);
+  return false;
+}
+
+
+bool
 spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
 {
 
@@ -66,8 +91,6 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t offset)
   entry->file_info.f = f;
   printf("FILE IS %p\n", f);
   entry->file_info.offset = offset;
-  printf("offset in insert is: %d\n", offset);
-  printf("bytes read in insert is: %d\n", size);
   entry->file_info.size = size;
   entry->info = FSYS;
   entry->vaddr = uaddr;
@@ -114,16 +137,21 @@ load_file(void *kpage, struct spt_entry *entry)
   printf("file pointer is %p\n", entry->file_info.f);
   printf("page_read_bytes is: %d\n", page_read_bytes);
   printf("offset is: %d\n\n\n\n\n", entry->file_info.offset);
-	if (file_read_at(entry->file_info.f, kpage, page_read_bytes, entry->file_info.offset) 
-                                                            != (int) page_read_bytes)
+  size_t bytes_actually_read = file_read_at(entry->file_info.f, 
+                                  kpage, page_read_bytes, entry->file_info.offset);
+	if (bytes_actually_read != page_read_bytes)
 		{
 		  frame_free(kpage);
 		  return;
 	  }
 	// Should we keep a variable zero in file_info?
+  ASSERT(PGSIZE >= page_read_bytes);
 	memset(kpage + page_read_bytes, 0, PGSIZE - page_read_bytes);
 	// Not sure if true should always be set.
-	pagedir_set_page(cur->pagedir, entry->vaddr, kpage, true);
+	bool success = pagedir_set_page(cur->pagedir, entry->vaddr, kpage, true);
+  if (!success) {
+    frame_free(kpage);
+  }
 
 
 }
@@ -152,7 +180,7 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
 
   // If page should be all-zero, fill it with zeroes
   } else if (spt_entry->info == ALL_ZERO){
-	memset(page, 0, PGSIZE);
+  	memset(page, 0, PGSIZE);
   }
 }
 
@@ -170,6 +198,7 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
+  frame_free(entry->frame_addr);
   free(entry);
 }
 
