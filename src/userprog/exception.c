@@ -154,7 +154,6 @@ page_fault (struct intr_frame *f)
     /* Exit status set to -1 when exception causes process to exit. */
     cur->exit_status = ERROR;
     if (fault_addr == NULL) {
-    	print_page_info();
     	printf("INSIDE ERROR \n\n");
     }
     sys_exit(ERROR);
@@ -166,13 +165,16 @@ page_fault (struct intr_frame *f)
   // Getting the page address by rounding fault_addr down to nearest page size multiple
   void *page_addr = pg_round_down(fault_addr);
  
+  printf("Page address is: %p \n", page_addr);
   // Getting the spt_entry for the page from the supplemental page table
   struct spt_entry *entry = get_spt_entry(&cur->supp_pt, page_addr);
+  
+  hashtable_debug();
 
   /* If page should not expect any data, check if stack should grow.
    * If not, terminate process and free resources. */
-  if (entry == NULL)
-  {
+  
+  if (entry == NULL){
 	  if (should_stack_grow(fault_addr, f->esp)) {
 		  grow_stack(fault_addr);
 	  } else {
@@ -187,7 +189,6 @@ page_fault (struct intr_frame *f)
 
   // 3. Fetch the data into the frame
   if (entry != NULL) {
-	  printf("HEEEEEEEEEEEEEEEEEELLLLLLLLLLLLLL");
 	  load_into_page(kpage, entry);
   }
 
@@ -205,6 +206,6 @@ page_fault (struct intr_frame *f)
   //         not_present ? "not present" : "rights violation",
   //         write ? "writing" : "reading",
   //         user ? "user" : "kernel");
-  kill (f);
+  //kill (f);
 }
 
