@@ -558,8 +558,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
-  printf("BOOL IN LOAD IS: %d\n",success);
   return success;
 }
 
@@ -633,6 +631,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
+  printf("read: %d, zero: %d\n", read_bytes, zero_bytes);
 
   off_t offset = ofs;
   printf("TOTAL BYTES= %d\n", read_bytes + zero_bytes);
@@ -646,20 +645,24 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 
       /* Track info for this page. */
-      //file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-      //!spt_insert_file(upage, kpage, file, read_bytes, ofs))
-      //printf("userpage is %p\n", upage);
-      if (!spt_insert_file(upage, file, page_read_bytes, offset))
-        {
-          printf("COULDNT INSERT FILE\n\n");
-          return false; 
+      if (page_zero_bytes == PGSIZE) {
+        if (!spt_insert_all_zero(upage)) {
+          return false;
         }
+      } else if (page_read_bytes == PGSIZE) {
+          if (!spt_insert_file(upage,file, page_read_bytes, offset)) {
+            return false; 
+          }
+      }
+      printf("page_read_bytes is %d\n", page_read_bytes);
+      printf("zeros %d\n", page_zero_bytes);
+      printf("offset is %d\n", offset);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      offset += PGSIZE;
+      offset += page_read_bytes;
     }
   return true;
 }
@@ -693,7 +696,6 @@ setup_stack (void **esp)
       else
         frame_free(kpage);
     }
-  printf("SETUP STACK IS %d\n", success);
   return success;
 }
 

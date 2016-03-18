@@ -165,11 +165,8 @@ page_fault (struct intr_frame *f)
   // Getting the page address by rounding fault_addr down to nearest page size multiple
   void *page_addr = pg_round_down(fault_addr);
  
-  printf("Page address is: %p \n", page_addr);
   // Getting the spt_entry for the page from the supplemental page table
   struct spt_entry *entry = get_spt_entry(&cur->supp_pt, page_addr);
-  
-  hashtable_debug();
 
   /* If page should not expect any data, check if stack should grow.
    * If not, terminate process and free resources. */
@@ -186,6 +183,7 @@ page_fault (struct intr_frame *f)
   // 2. Obtain frame to store the page
 
   void *kpage = frame_alloc(PAL_USER, page_addr);
+
 
   // 3. Fetch the data into the frame
   if (entry != NULL) {
