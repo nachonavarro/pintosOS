@@ -71,16 +71,3 @@ mapid_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNU
   const struct mmap_mapping *b = hash_entry(b_, struct mmap_mapping, hash_elem);
   return a->mapid < b->mapid;
 }
-
-void
-destroy_mmap_table(struct hash *mmap_table) {
-  hash_destroy(mmap_table, free_using_hash_elem);
-}
-
-/* Destructor hash_action_func to be passed to hash_destroy to free all
-   malloc'd struct mmap_mapping's in a mmap_table. */
-static void
-free_using_hash_elem(struct hash_elem *e, void* aux UNUSED) {
-  struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
-  free(mmap);
-}
