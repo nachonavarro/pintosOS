@@ -9,10 +9,10 @@
 #define PUSHA_PERMISSION_BYTES 32
 
 enum page_info {
-	ALL_ZERO,
 	SWAP,
 	FSYS,
-	MMAP
+	MMAP,
+  ALL_ZERO
 };
 
 struct file_info {

@@ -175,18 +175,21 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
   // If page data is in swap slot, swap out, into the frame
   
   if (spt_entry->info == SWAP) {
+    printf("SWAP\n");
     load_from_disk(page, spt_entry);
-
   // If page data is in file system, load file into frame 
   } else if (spt_entry->info == FSYS) {
+    printf("FSYS\n");
     load_file(page, spt_entry);
 
   // If page data is in memory mapped files, load into frame
   } else if (spt_entry->info == MMAP) {
+    printf("MMAP\n");
     load_mmf(page, spt_entry);
 
   // If page should be all-zero, fill it with zeroes
   } else if (spt_entry->info == ALL_ZERO){
+    printf("ZERO\n");
   	memset(page, 0, PGSIZE);
     install_page(spt_entry->vaddr, page, true);
   }

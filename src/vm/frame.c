@@ -97,14 +97,14 @@ bool
 save_frame(struct fte *frame)
 {
   struct thread *t = tid_to_thread((tid_t) frame->owner);
+  ASSERT(t != NULL);
   struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage); 
-
-  if (entry->info != FSYS) {
-    printf("INSIDE FSYS");
-    size_t swap_slot = swap_in(entry->vaddr);
-    entry->swap_slot = swap_slot;
-    pagedir_clear_page(t->pagedir, entry->vaddr);
-  }
+ 
+  ASSERT(entry != NULL);
+  size_t swap_slot = swap_in(entry->vaddr);
+  entry->swap_slot = swap_slot;
+  entry->info = SWAP;
+  pagedir_clear_page(t->pagedir, entry->vaddr);
   return true;
 }
 
