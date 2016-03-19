@@ -565,8 +565,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-bool install_page (void *upage, void *kpage, bool writable);
-
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
 static bool
@@ -650,7 +648,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false;
         }
       } else {
-          if (!spt_insert_file(upage,file, page_read_bytes, page_zero_bytes, offset, false)) {
+          if (!spt_insert_file(upage,file, page_read_bytes, 
+                page_zero_bytes, offset, writable, false)) {
             return false; 
           }
       }

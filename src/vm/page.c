@@ -85,7 +85,7 @@ spt_insert_all_zero(void *uaddr)
 /* Used to insert an FSYS or a MMAP file into the supplementary page table.
    If MMAP bool is true, it is MMAP we are inserting, otherwise it is FSYS. */
 bool
-spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset, bool mmap)
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset, bool writable, bool mmap)
 {
 
   struct thread *cur = thread_current();
@@ -99,6 +99,7 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   entry->file_info.offset = offset;
   entry->file_info.size = size;
   entry->file_info.zeros = zeros;
+  entry->file_info.writable = writable;
   entry->info = mmap ? MMAP : FSYS;
   entry->vaddr = uaddr;
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
@@ -128,7 +129,11 @@ get_spt_entry(struct hash *table, void *address)
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	//struct thread *cur = thread_current();
+	struct thread *cur = thread_current();
+ 	bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
+  if (!success) {
+    frame_free(page);
+  }
 	swap_out(page, spt_entry->swap_slot);
 }
 
@@ -149,7 +154,7 @@ load_file(void *kpage, struct spt_entry *entry)
 	// Should we keep a variable zero in file_info?
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
-	bool success = install_page(entry->vaddr, kpage, true);
+	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
   if (!success) {
     frame_free(kpage);
   }
@@ -246,6 +251,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-//    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
+    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
   }
 }

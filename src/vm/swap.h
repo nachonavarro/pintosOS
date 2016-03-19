@@ -10,6 +10,6 @@
 
 void swap_init(void);
 void swap_out(void *, size_t);
-void swap_in(void *);
+size_t swap_in(void *);
 
 #endif /* vm/swap.h */

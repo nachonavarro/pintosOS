@@ -3,6 +3,8 @@
 #include "lib/random.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
+#include "swap.h"
+#include "userprog/pagedir.h"
 
 static struct list frame_table;
 static struct lock frame_table_lock;
@@ -83,10 +85,30 @@ choose_frame_to_evict(void) {
 /* Evict a frame. Returns a frame (the evicted frame), like frame_alloc() would have returned. Returns
    NULL on failure. */
 void *
-evict(void *upage UNUSED) {
-  //TODO: Needs implemeting - Calls choose_frame_to_evict() first?
-  return NULL;
+evict(void *upage) {
+  struct fte *frame_entry = choose_frame_to_evict();
+  if (!save_frame(frame_entry)) {
+    PANIC("Can not save frame.");
+  }
+  return frame_entry->frame;
 }
+
+bool
+save_frame(struct fte *frame)
+{
+  struct thread *t = tid_to_thread((tid_t) frame->owner);
+  struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage); 
+
+  if (entry->info != FSYS) {
+    printf("INSIDE FSYS");
+    size_t swap_slot = swap_in(entry->vaddr);
+    entry->swap_slot = swap_slot;
+    pagedir_clear_page(t->pagedir, entry->vaddr);
+  }
+  return true;
+}
+
+
 
 /* Creates a frame that will contain a pointer to the given page, and adds
    this frame to the frame table. Returns true if frame was successfully

@@ -19,12 +19,13 @@ struct file_info {
 	struct file *f;
 	size_t offset;
 	size_t size;
-    size_t zeros;
+  size_t zeros;
+  size_t writable;
 };
 
 
 struct spt_entry {
-	void   *vaddr;
+	  void   *vaddr;
     void   *frame_addr;
     size_t swap_slot;
     enum page_info info;
@@ -35,7 +36,7 @@ struct spt_entry {
 void spt_init(struct hash *spt);
 bool spt_insert(struct hash *spt, struct spt_entry *entry);
 bool spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros,
-                     size_t offset, bool mmap);
+                     size_t offset, bool writable, bool mmap);
 bool spt_insert_all_zero(void *uaddr);
 struct spt_entry* get_spt_entry(struct hash *table, void *address);
 void spt_destroy(struct hash *hashmap);
@@ -44,6 +45,7 @@ void load_into_page(void *page, struct spt_entry *entry);
 void load_from_disk(void *page, struct spt_entry *entry);
 void load_file(void *page, struct spt_entry *entry);
 void load_mmf(void *page, struct spt_entry *entry);
+bool install_page(void *upage, void *kpage, bool writable);
 
 bool should_stack_grow(void *uaddr, void *esp);
 void grow_stack(void *addr);
