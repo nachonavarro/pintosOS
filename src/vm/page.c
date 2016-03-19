@@ -175,21 +175,21 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
   // If page data is in swap slot, swap out, into the frame
   
   if (spt_entry->info == SWAP) {
-    printf("SWAP\n");
+    // printf("SWAP\n");
     load_from_disk(page, spt_entry);
   // If page data is in file system, load file into frame 
   } else if (spt_entry->info == FSYS) {
-    printf("FSYS\n");
+    // printf("FSYS\n");
     load_file(page, spt_entry);
 
   // If page data is in memory mapped files, load into frame
   } else if (spt_entry->info == MMAP) {
-    printf("MMAP\n");
+    // printf("MMAP\n");
     load_mmf(page, spt_entry);
 
   // If page should be all-zero, fill it with zeroes
   } else if (spt_entry->info == ALL_ZERO){
-    printf("ZERO\n");
+    // printf("ZERO\n");
   	memset(page, 0, PGSIZE);
     install_page(spt_entry->vaddr, page, true);
   }
@@ -218,16 +218,19 @@ should_stack_grow(void *addr, void *esp)
 {
     bool heuristic;
     /* Check fault address doesn't pass stack limit growth. */
-    heuristic = (PHYS_BASE - pg_round_down(addr) <= STACK_LIMIT);
+    heuristic = (((uint32_t) PHYS_BASE) - ((uint32_t) pg_round_down(addr))) <= STACK_LIMIT;
     /* Check fault address is above the limit of the stack minus the permission bytes. */
-    heuristic = addr >= esp - PUSHA_PERMISSION_BYTES;
+    heuristic &= ((uint32_t) addr) >= ((uint32_t) esp) - PUSHA_PERMISSION_BYTES;
+
     return heuristic;
 }
 
 void
 grow_stack(void *addr)
 {
+    // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
+    // TODO: Add to spt?
     /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }

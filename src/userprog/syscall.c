@@ -753,7 +753,8 @@ get_word_on_stack(struct intr_frame *f, int offset)
 {
   uint32_t *esp = f->esp;
   check_mem_ptr(esp + offset);
-  return *(esp + offset);
+  uint32_t word = *(esp + offset);
+  return word;
 }
 
 /* If supplied pointer is a null pointer, not in the user address space, or

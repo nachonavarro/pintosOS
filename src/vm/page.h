@@ -53,7 +53,7 @@ void hashtable_debug(void);
 
 
 // void spt_modify(struct hash *spt, struct spt_entry *entry)
-// do we need this? or when we insert an already existing spt_elem, it modifies it to its new value?
+// TODO: do we need this? or when we insert an already existing spt_elem, it modifies it to its new value?
 
 
 
