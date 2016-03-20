@@ -74,10 +74,12 @@ choose_frame_to_evict(void) {
   ASSERT(ftes > 0); //Should call when table is full (Don't know max size right now)
   int random_fte = (random_ulong()) % (ftes); //Random number between 0 and (size - 1) inclusive.
   struct list_elem *e;
+  struct fte *fte;
   for (e = list_begin(&frame_table); random_fte > 0; random_fte--) {
     e = list_next(e);
+    fte = list_entry(e, struct fte, fte_elem);
+    //printf("frame is %p, upage is %p, owner is %d \n",fte->frame, fte->upage, fte->owner);
   }
-  struct fte *fte = list_entry(list_begin(&frame_table), struct fte, fte_elem);
   return fte;
 }
 
@@ -86,30 +88,42 @@ choose_frame_to_evict(void) {
 void *
 evict(void *upage) {
   struct fte *frame_entry = choose_frame_to_evict();
-  frame_entry->upage = NULL;
-  if (!save_frame(frame_entry)) {
-    PANIC("Can not save frame.");
-  }
+  save_frame(frame_entry, upage);
+  ASSERT(frame_entry->frame != NULL);
   return frame_entry->frame;
 }
 
-bool
-save_frame(struct fte *frame)
+static int m = 0;
+
+void
+save_frame(struct fte *frame, void *upage)
 {
+  printf("TID OWNER: %d\n", frame->owner);
   struct thread *t = tid_to_thread((tid_t) frame->owner);
   ASSERT(t != NULL);
-  struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage); 
+  struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage);
+  entry->vaddr = upage;
+  frame->upage = upage;
+  entry->frame_addr = frame->frame;
+  ASSERT(entry != NULL);
+  ASSERT(frame->upage == entry->vaddr);
+  //printf("vaddr is %p \n", entry->vaddr);
+  bool dirty = pagedir_is_dirty(&t->supp_pt, entry->vaddr);
   if (entry->file_info.executable && entry->info == FSYS) {
       entry->info = SWAP;
   }
-  if (entry->info == SWAP || entry->info == ALL_ZERO || pagedir_is_dirty(&t->supp_pt, entry->vaddr)) {
-      file_write_at(entry->file_info.f, entry->frame_addr, entry->file_info.size, entry->file_info.offset);
-  } else if (entry->info == FSYS || entry->info == MMAP) {
-      size_t swap_slot = swap_in(frame->frame);
+  if (entry->info == SWAP || entry->info == ALL_ZERO) {
+      m++;
+      printf("Number of swap in to disk: %d\n", m);
+      size_t swap_slot = swap_in(entry->frame_addr);
       entry->swap_slot = swap_slot;
+      entry->frame_addr = frame->frame;
+  } else if (entry->info == FSYS || entry->info == MMAP) {
+      file_write_at(entry->file_info.f, entry->frame_addr, entry->file_info.size, entry->file_info.offset);
   }
-  pagedir_clear_page(t->pagedir, entry->vaddr);
-  return true;
+  //ASSERT(frame->frame == entry->frame_addr);
+  ASSERT(frame->upage == entry->vaddr);
+  pagedir_clear_page(t->pagedir, frame->upage);
 }
 
 

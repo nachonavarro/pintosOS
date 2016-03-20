@@ -675,6 +675,7 @@ setup_stack (void **esp)
   spt_insert_all_zero(upage);
 
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
+  spt_insert_all_zero(upage);
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);
