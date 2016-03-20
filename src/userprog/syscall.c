@@ -668,6 +668,7 @@ sys_munmap(mapid_t mapping)
   lock_release(&cur->mmap_table_lock);
 }
 
+/* Called from hash_clear(). Does most of what sys_munmap() does. */
 void
 munmap_exiting(struct hash_elem *e, void *aux UNUSED) {
   struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);

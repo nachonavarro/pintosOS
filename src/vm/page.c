@@ -215,7 +215,10 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
-  frame_free(entry->frame_addr);
+  //TODO: Took out frame_free here because it broke ALL tests
+ // if (in_memory) {
+   // frame_free(entry->frame_addr);
+ // }
   free(entry);
 }
 
@@ -237,9 +240,10 @@ grow_stack(void *addr)
 {
     // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
-    struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt,
-                                                        addr);
-    entry->frame_addr = page;
+    //TODO: Below 3 lines have been commented out as they broke stack tests
+//    struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt,
+//                                                        addr);
+//    entry->frame_addr = page;
     /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }

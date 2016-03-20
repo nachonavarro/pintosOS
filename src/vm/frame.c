@@ -147,7 +147,7 @@ evict(void *upage) {
 void
 save_frame(struct fte *frame, void *upage)
 {
-  printf("TID OWNER: %d\n", frame->owner);
+//  printf("TID OWNER: %d\n", frame->owner);
   struct thread *t = tid_to_thread((tid_t) frame->owner);
   ASSERT(t != NULL);
   struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage);
