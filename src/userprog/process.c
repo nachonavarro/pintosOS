@@ -672,10 +672,17 @@ setup_stack (void **esp)
   bool success = false;
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  spt_insert_all_zero(upage);
 
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
-  spt_insert_all_zero(upage);
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREE.
+  if (entry == NULL) {
+      return false;
+  }
+  entry->info = ALL_ZERO;
+  entry->vaddr = upage;
+  entry->frame_addr = kpage;
+  struct hash_elem *elem;
+  elem = hash_insert(&thread_current()->supp_pt, &entry->elem); //Should check null?
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);

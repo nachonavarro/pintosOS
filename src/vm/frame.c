@@ -200,10 +200,6 @@ debug_frame(void) {
         struct fte *fte = list_entry(e, struct fte, fte_elem);
         struct thread *t = tid_to_thread((tid_t) fte->owner);
         struct spt_entry *entry = get_spt_entry(&t->supp_pt, fte->upage);
-        if (fte->frame != entry->frame_addr) {
-            printf("NOT THE SAME\n\n");
-            break;
-        }
         printf("%d: frame is: %p, vaddr is: %p, thread owner is: %d.\n", count, fte->frame, fte->upage, fte->owner);
     }
     printf("-----------------------------------\n\n");

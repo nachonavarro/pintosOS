@@ -12,7 +12,7 @@ enum page_info {
 	SWAP,
 	FSYS,
 	MMAP,
-  ALL_ZERO
+	ALL_ZERO
 };
 
 struct file_info {
