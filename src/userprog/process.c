@@ -337,7 +337,7 @@ process_exit (void)
 
   /* Frees resources of all entries in the mmap_table, as well as freeing the
      memory allocated for the table itself. */
-  hash_destroy(&cur->mmap_table, munmap_from_hash_elem);
+  hash_destroy(&cur->mmap_table, munmap_exiting);
   //TODO: May need to free more resources from the supplemental table
   /* Free process resources and destroy its supplemental page table. */
   spt_destroy(&cur->supp_pt);

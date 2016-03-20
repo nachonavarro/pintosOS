@@ -171,6 +171,7 @@ load_file(void *kpage, struct spt_entry *entry)
 
 }
 
+//TODO: Remove?
 void
 load_mmf(void *page UNUSED, struct spt_entry *entry UNUSED)
 {
@@ -192,9 +193,9 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
     load_file(page, spt_entry);
 
   // If page data is in memory mapped files, load into frame
-  } else if (spt_entry->info == MMAP) {
+  } else if (spt_entry->info == MMAP) { //TODO: MMAP just seems unnecessary now...
     // printf("MMAP\n");
-    load_mmf(page, spt_entry);
+    load_file(page, spt_entry);
 
   // If page should be all-zero, fill it with zeroes
   } else if (spt_entry->info == ALL_ZERO){
