@@ -39,6 +39,7 @@ static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 static void check_buffer(const void *buffer, unsigned size);
 static bool is_executable(const char *file);
+static void pages_munmap(struct mmap_mapping *mmap);
 
 void
 syscall_init (void) 
@@ -550,16 +551,13 @@ sys_mmap(int fd, void *addr)
     return ERROR;
   }
 
-  //TODO: Still need to 'return ERROR' if range of pages mapped overlaps any
-  //      existing mapped pages.
-  /* num_stack_pages is number of pages for the stack for this process, I
-     think. However, could probably use the esp of the current thread, and then
-     simply compare this with ADDR
-     (Want ADDR < esp OR ADDR < PHYS_BASE - num_stack_pages*PGSIZE) */
-  int num_stack_pages = 0; //TODO: Change from 0
-  if (addr > PHYS_BASE - (num_stack_pages*PGSIZE)) {
-    return ERROR;
-  }
+//  /* num_stack_pages is number of pages for the stack for this process, I
+//     think. However, could probably use the esp of the current thread, and then
+//     simply compare this with ADDR. */
+//  int num_stack_pages = 0; //TODO: Change from 0
+//  if (addr > PHYS_BASE - (num_stack_pages*PGSIZE)) {
+//    return ERROR;
+//  }
 
   /* If ADDR is not in user/process address space, we cannot map
        the file there. */
@@ -642,17 +640,6 @@ sys_mmap(int fd, void *addr)
   return mapid;
 }
 
-//TODO: Delete this comment.
-/* ***STEPS IN A MUNMAP***
- *
- * *Each pages written to need to be written back to file (Dirty bit!)
- *
- * *Remove each page from spt
- *
- * *hash_delete() and free(struct mmap_mapping) (in mmap_mapping_delete, but
- *  this needs to be changed, because we now need to mmap_mapping_lookup in
- *  sys_munmap)                                                              */
-
 /* Unmaps the mapping for current thread with mapid MAPPING. Each page that
    has been wriiten to by the process needs to be written back to the file.
    Each page must be removed from the process' list of virtual pages. */
@@ -660,7 +647,6 @@ static void
 sys_munmap(mapid_t mapping)
 {
   struct thread *cur = thread_current();
-  struct hash *spt = &cur->supp_pt;
   struct hash *mmap_table = &cur->mmap_table;
   struct mmap_mapping *mmap = mmap_mapping_lookup(mmap_table, mapping);
 
@@ -670,6 +656,35 @@ sys_munmap(mapid_t mapping)
     sys_exit(ERROR);
   }
 
+  /* Removes all pages in mapping from the process' list of virtual pages, and
+     writes pages back to file if they have been written to by the process. */
+  pages_munmap(mmap);
+
+  /* Lock must be acquired to call hash_delete() in mmap_mapping_delete(). */
+  lock_acquire(&cur->mmap_table_lock);
+  /* Remove the mapping MMAP from MMAP_TABLE and free MMAP. */
+  mmap_mapping_delete(mmap_table, mmap);
+  lock_release(&cur->mmap_table_lock);
+}
+
+void
+munmap_exiting(struct hash_elem *e, void *aux UNUSED) {
+  struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
+  /* Cannot just call sys_munmap(mmap->mapid) because munmap_from_hash_elem()
+     should only be called from hash_clear(), where it was passed as the
+     desctructor. hash_clear() will pop the mmap_mapping out of the hash
+     table, so sys_munmap() will not work anymore. */
+  pages_munmap(mmap);
+}
+
+/* Removes all pages in the given MMAP mapping from the current process' list
+   of virtual pages - the supplmentary page table. Also, each page that has
+   been written to by the current process must be written back to the file.
+   Called by sys_munmap() and munmap_exiting(). */
+static void
+pages_munmap(struct mmap_mapping *mmap) {
+  struct thread *cur = thread_current();
+  struct hash *spt = &cur->supp_pt;
   void *page_uaddr = mmap->start_uaddr;
   int num_pages = mmap->num_pages;
   uint32_t *pd = cur->pagedir;
@@ -712,18 +727,6 @@ sys_munmap(mapid_t mapping)
     /* Advance to the next page. */
     page_uaddr += PGSIZE;
   }
-
-  /* Lock must be acquired to call hash_delete() in mmap_mapping_delete(). */
-  lock_acquire(&cur->mmap_table_lock);
-  /* Remove the mapping MMAP from MMAP_TABLE and free MMAP. */
-  mmap_mapping_delete(mmap_table, mmap);
-  lock_release(&cur->mmap_table_lock);
-}
-
-void
-munmap_from_hash_elem(struct hash_elem *e, void *aux UNUSED) {
-  struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
-  sys_munmap(mmap->mapid);
 }
 
 /* Returns the file corresponding the to supplied file descriptor
