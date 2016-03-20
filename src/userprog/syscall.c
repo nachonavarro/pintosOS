@@ -578,6 +578,7 @@ sys_mmap(int fd, void *addr)
 
   struct thread *cur = thread_current();
   struct hash *mmap_table = &cur->mmap_table;
+  struct hash *spt = &cur->supp_pt;
 
   lock_acquire(&secure_file);
   struct file *old_file = get_file(fd);
@@ -603,7 +604,7 @@ sys_mmap(int fd, void *addr)
     cur_page = (void *) ((uint8_t *) addr) + (i * PGSIZE);
     /* Check to see if there is an existing mapped page at what would be the
        i'th page of this mapped file. */
-    if (get_spt_entry(mmap_table, cur_page) != NULL) { //TODO: Pretty sure this should be != NULL, but when it was == NULL, some more tests fail, but some more pass (I think) - double check this please
+    if (get_spt_entry(spt, cur_page) != NULL) { //TODO: Pretty sure this should be != NULL, but when it was == NULL, some more tests fail, but some more pass (I think) - double check this please
       return ERROR;
     }
     /* Only on the last page do we potentially not fill up whole page with
