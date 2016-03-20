@@ -26,6 +26,7 @@ void frame_table_init(void);
 void *frame_alloc(enum palloc_flags flags, void *upage);
 void frame_free(void *frame);
 struct fte *choose_frame_to_evict(void);
+bool save_frame(struct fte *);
 void *evict(void *upage);
 
 #endif /* vm/frame.h */

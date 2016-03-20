@@ -119,6 +119,7 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
+
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -157,7 +158,7 @@ page_fault (struct intr_frame *f)
   }
 
 
-  // 1. Locate page that faulted in SPT
+  // Locate page that faulted in SPT
 
   // Getting the page address by rounding fault_addr down to nearest page size multiple
   void *page_addr = pg_round_down(fault_addr);
@@ -170,7 +171,8 @@ page_fault (struct intr_frame *f)
   //printf("-----------------------------------------\n");
   //hashtable_debug();
   //printf("entry->vaddr is: %p \n", entry->vaddr);
-  if (entry == NULL){
+  if (entry == NULL)
+  {
     if (should_stack_grow(fault_addr, f->esp)) {
 		  grow_stack(fault_addr);
 	  } else {
@@ -179,17 +181,17 @@ page_fault (struct intr_frame *f)
 	  }
   }
 
-  // 2. Obtain frame to store the page
+  // Obtaining frame to store the page
 
-  void *kpage = frame_alloc(PAL_USER | PAL_ZERO, page_addr);
+  void *kpage = frame_alloc(PAL_USER, page_addr);
 
-  // 3. Fetch the data into the frame
+  // Fetching the data into the frame
   if (entry != NULL) {
     entry->frame_addr = kpage;
-	  load_into_page(kpage, entry);
+	load_into_page(kpage, entry);
   }
 
-  // 4. Point page table entry for the faulting virtual address to the frame
+
 
 
   // TODO: Delete following lines?

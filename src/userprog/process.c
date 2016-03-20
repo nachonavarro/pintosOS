@@ -337,7 +337,7 @@ process_exit (void)
 
   /* Frees resources of all entries in the mmap_table, as well as freeing the
      memory allocated for the table itself. */
-  hash_destroy(&cur->mmap_table, munmap_from_hash_elem);
+  hash_destroy(&cur->mmap_table, munmap_exiting);
   //TODO: May need to free more resources from the supplemental table
   /* Free process resources and destroy its supplemental page table. */
   spt_destroy(&cur->supp_pt);
@@ -565,8 +565,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-bool install_page (void *upage, void *kpage, bool writable);
-
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
 static bool
@@ -650,7 +648,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false;
         }
       } else {
-          if (!spt_insert_file(upage,file, page_read_bytes, page_zero_bytes, offset)) {
+          if (!spt_insert_file(upage, file, page_read_bytes,
+                page_zero_bytes, offset, writable, false, true)) {
             return false; 
           }
       }
@@ -673,16 +672,9 @@ setup_stack (void **esp)
   bool success = false;
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  spt_insert_all_zero(upage);
 
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // REMEMBER TO FREE.
-  if (entry == NULL) {
-	  return false;
-  }
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
-  entry->frame_addr = kpage;
-  entry->vaddr = upage;
-  entry->info = ALL_ZERO;
-  spt_insert(&thread_current()->supp_pt, entry);
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);
@@ -712,6 +704,8 @@ install_page (void *upage, void *kpage, bool writable)
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
+
+  // TODO: Change these to spt_get_entry and spt_insert??
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }

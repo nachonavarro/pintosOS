@@ -39,6 +39,7 @@ static void check_fd(int fd);
 static uint32_t get_word_on_stack(struct intr_frame *f, int offset);
 static void check_buffer(const void *buffer, unsigned size);
 static bool is_executable(const char *file);
+static void pages_munmap(struct mmap_mapping *mmap);
 
 void
 syscall_init (void) 
@@ -356,10 +357,9 @@ sys_read(int fd, void *buffer, unsigned size, struct intr_frame *f)
     struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt, buf_iter);
     if (entry == NULL && should_stack_grow(buf_iter, f->esp)) {
         grow_stack(buf_iter); 
+    } else if (entry != NULL) {
     }
   }
-  
-
 
   /* fd = 0 corresponds to reading from stdin. */
   if (fd == STDIN_FILENO) 
@@ -551,16 +551,14 @@ sys_mmap(int fd, void *addr)
     return ERROR;
   }
 
-  //TODO: Still need to 'return ERROR' if range of pages mapped overlaps any
-  //      existing mapped pages.
-  /* num_stack_pages is number of pages for the stack for this process, I
-     think. However, could probably use the esp of the current thread, and then
-     simply compare this with ADDR
-     (Want ADDR < esp OR ADDR < PHYS_BASE - num_stack_pages*PGSIZE) */
-  int num_stack_pages = 0; //TODO: Change from 0
-  if (addr > PHYS_BASE - (num_stack_pages*PGSIZE)) {
-    return ERROR;
-  }
+  //TODO: DO WE EVEN NEED TO DO THIS
+//  /* num_stack_pages is number of pages for the stack for this process, I
+//     think. However, could probably use the esp of the current thread, and then
+//     simply compare this with ADDR. */
+//  int num_stack_pages = 0; //TODO: Change from 0
+//  if (addr > PHYS_BASE - (num_stack_pages*PGSIZE)) {
+//    return ERROR;
+//  }
 
   /* If ADDR is not in user/process address space, we cannot map
        the file there. */
@@ -579,24 +577,7 @@ sys_mmap(int fd, void *addr)
 
   struct thread *cur = thread_current();
   struct hash *mmap_table = &cur->mmap_table;
-
-  /* Check that the contiguous range of pages to be mapped doesn't overlap
-     any existing set of mapped pages (Not including stack). */
-  int i;
-  for (i = 0; i < pages; i++) {
-    /* Check to see if there is an existing mapped page at what would be the
-       i'th page of this mapped file. */
-    if (get_spt_entry(mmap_table, ((uint8_t *) addr) + (i * PGSIZE)) == NULL) {
-      return ERROR;
-    }
-  }
-
-  //TODO: Insert all new pages into supplementary page table???? Is this
-  //      the lazy thing??? I thought lazy means only when we try to access
-  //      it and page fault, then we check to see if we have it, then try
-  //      to load it
-  //      THIS MAY BE WHAT CAUSES THE PAGES TO BE ADDED TO THE PROCESS' LIST OF
-  //      VIRTUAL PAGES!!
+  struct hash *spt = &cur->supp_pt;
 
   lock_acquire(&secure_file);
   struct file *old_file = get_file(fd);
@@ -611,6 +592,27 @@ sys_mmap(int fd, void *addr)
      not another of same file (inode) but different struct file). */
   struct file *file = file_reopen(old_file);
   lock_release(&secure_file);
+
+  int i;
+  int bytes_to_write;
+  void *cur_page;
+  /* Check that the contiguous range of pages to be mapped doesn't overlap
+     any existing set of mapped pages (Not including stack). Can then add
+     these pages to the supplementary page table. */
+  for (i = 0; i < pages; i++) {
+    cur_page = (void *) ((uint8_t *) addr) + (i * PGSIZE);
+    /* Check to see if there is an existing mapped page at what would be the
+       i'th page of this mapped file. */
+    if (get_spt_entry(spt, cur_page) != NULL) { //TODO: Pretty sure this should be != NULL, but when it was == NULL, some more tests fail, but some more pass (I think) - double check this please
+      return ERROR;
+    }
+    /* Only on the last page do we potentially not fill up whole page with
+       part of file. */
+    bytes_to_write = (i == (pages - 1)) ? (size % PGSIZE) : PGSIZE;
+    /* Add current page to the supplementary page table. */
+    spt_insert_file(cur_page, file, bytes_to_write,
+                          PGSIZE - bytes_to_write, i * PGSIZE, true, true, false);
+  }
 
   mapid_t mapid = cur->next_mapid;
 
@@ -639,17 +641,6 @@ sys_mmap(int fd, void *addr)
   return mapid;
 }
 
-//TODO: Delete this comment.
-/* ***STEPS IN A MUNMAP***
- *
- * *Each pages written to need to be written back to file (Dirty bit!)
- *
- * *Remove each page from spt
- *
- * *hash_delete() and free(struct mmap_mapping) (in mmap_mapping_delete, but
- *  this needs to be changed, because we now need to mmap_mapping_lookup in
- *  sys_munmap)                                                              */
-
 /* Unmaps the mapping for current thread with mapid MAPPING. Each page that
    has been wriiten to by the process needs to be written back to the file.
    Each page must be removed from the process' list of virtual pages. */
@@ -657,7 +648,6 @@ static void
 sys_munmap(mapid_t mapping)
 {
   struct thread *cur = thread_current();
-  struct hash *spt = &cur->supp_pt;
   struct hash *mmap_table = &cur->mmap_table;
   struct mmap_mapping *mmap = mmap_mapping_lookup(mmap_table, mapping);
 
@@ -667,6 +657,35 @@ sys_munmap(mapid_t mapping)
     sys_exit(ERROR);
   }
 
+  /* Removes all pages in mapping from the process' list of virtual pages, and
+     writes pages back to file if they have been written to by the process. */
+  pages_munmap(mmap);
+
+  /* Lock must be acquired to call hash_delete() in mmap_mapping_delete(). */
+  lock_acquire(&cur->mmap_table_lock);
+  /* Remove the mapping MMAP from MMAP_TABLE and free MMAP. */
+  mmap_mapping_delete(mmap_table, mmap);
+  lock_release(&cur->mmap_table_lock);
+}
+
+void
+munmap_exiting(struct hash_elem *e, void *aux UNUSED) {
+  struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
+  /* Cannot just call sys_munmap(mmap->mapid) because munmap_from_hash_elem()
+     should only be called from hash_clear(), where it was passed as the
+     desctructor. hash_clear() will pop the mmap_mapping out of the hash
+     table, so sys_munmap() will not work anymore. */
+  pages_munmap(mmap);
+}
+
+/* Removes all pages in the given MMAP mapping from the current process' list
+   of virtual pages - the supplmentary page table. Also, each page that has
+   been written to by the current process must be written back to the file.
+   Called by sys_munmap() and munmap_exiting(). */
+static void
+pages_munmap(struct mmap_mapping *mmap) {
+  struct thread *cur = thread_current();
+  struct hash *spt = &cur->supp_pt;
   void *page_uaddr = mmap->start_uaddr;
   int num_pages = mmap->num_pages;
   uint32_t *pd = cur->pagedir;
@@ -700,23 +719,15 @@ sys_munmap(mapid_t mapping)
       lock_release(&secure_file);
     }
 
-    //TODO: spt_remove(page from spt)
+    //TODO: Change this to spt_remove(page from spt), so free() is called on
+    //      appropriate stuff and better abstraction - Just waiting for this
+    //      function to be implemented.
+    struct spt_entry *entry = get_spt_entry(spt, page_uaddr);
+    hash_delete(spt, &entry->elem);
 
     /* Advance to the next page. */
     page_uaddr += PGSIZE;
   }
-
-  /* Lock must be acquired to call hash_delete() in mmap_mapping_delete(). */
-  lock_acquire(&cur->mmap_table_lock);
-  /* Remove the mapping MMAP from MMAP_TABLE and free MMAP. */
-  mmap_mapping_delete(mmap_table, mmap);
-  lock_release(&cur->mmap_table_lock);
-}
-
-void
-munmap_from_hash_elem(struct hash_elem *e, void *aux UNUSED) {
-  struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
-  sys_munmap(mmap->mapid);
 }
 
 /* Returns the file corresponding the to supplied file descriptor
@@ -747,16 +758,23 @@ get_word_on_stack(struct intr_frame *f, int offset)
 {
   uint32_t *esp = f->esp;
   check_mem_ptr(esp + offset);
-  return *(esp + offset);
+  uint32_t word = *(esp + offset);
+  return word;
 }
 
 /* If supplied pointer is a null pointer, not in the user address space, or
    is an unmapped virtual address, the process is terminated. */
+
+/* TODO: Fix edge case by checking pointer is not an unmapped virtual address
+   Could use get_spt_entry(&t->supp_pt, uaddr) == NULL but does not work */
 static void
 check_mem_ptr(const void *uaddr) 
 {
-  if (uaddr == NULL || !is_user_vaddr(uaddr))
+  struct thread *t = thread_current(); 
+  if (uaddr == NULL || !is_user_vaddr(uaddr)) {
     sys_exit(ERROR);
+  }
+    
 }
 
 /* Checks that all of the buffer that we are writing/reading from is valid. */

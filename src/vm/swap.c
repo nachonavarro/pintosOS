@@ -2,6 +2,7 @@
 #include "devices/block.h"
 #include "threads/synch.h"
 #include "lib/kernel/bitmap.h"
+#include "userprog/pagedir.h"
 
 struct block *swap_space;
 struct lock swap_lock;
@@ -18,7 +19,7 @@ swap_init(void)
     lock_init(&swap_lock);
 }
 
-void
+size_t
 swap_in(void *buf)
 {
     /* Find a free slot and set it to occupied.*/
@@ -26,17 +27,20 @@ swap_in(void *buf)
     size_t free_slot_index =
             bitmap_scan_and_flip(swap_bitmap, BITMAP_START_INDEX,
                                     NUM_OF_SLOTS_TO_SWAP, false);
+    lock_release(&swap_lock);
     if (free_slot_index == BITMAP_ERROR)
         {
             PANIC("No swap space available.");
         }
 
-    lock_release(&swap_lock);
     int i;
     for (i = 0; i < SECTORS_PER_PAGE; i++)
         {
-            block_write(swap_space, SECTORS_PER_PAGE * free_slot_index + i, buf + i);
+            block_write(swap_space, 
+                SECTORS_PER_PAGE * free_slot_index + i, 
+                   buf + i * BLOCK_SECTOR_SIZE);
         }
+    return free_slot_index;
 }
 
 
@@ -51,8 +55,9 @@ swap_out(void *buf, size_t swap_slot)
     int i;
     for (i = 0; i < SECTORS_PER_PAGE; i++)
         {
-            void *loc_buf = buf + i;
-            block_read(swap_space, SECTORS_PER_PAGE * swap_slot + i, loc_buf);
+            block_read(swap_space, 
+                SECTORS_PER_PAGE * swap_slot + i, 
+                  buf + i * BLOCK_SECTOR_SIZE);
         }
 }
 

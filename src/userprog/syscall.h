@@ -29,6 +29,6 @@ struct proc_file {
 
 void syscall_init (void);
 void sys_exit (int status);
-void munmap_from_hash_elem(struct hash_elem *, void *);
+void munmap_exiting(struct hash_elem *, void *);
 
 #endif /* userprog/syscall.h */

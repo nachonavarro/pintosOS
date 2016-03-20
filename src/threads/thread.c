@@ -1035,9 +1035,6 @@ is_idle_thread(struct thread *t){
 struct thread *
 tid_to_thread(tid_t tid) {
   struct list_elem *e;
-
-  ASSERT (intr_get_level () == INTR_OFF);
-
   for (e = list_begin (&all_list);
        e != list_end (&all_list);
        e = list_next (e)) {

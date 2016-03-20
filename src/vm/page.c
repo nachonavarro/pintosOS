@@ -43,15 +43,21 @@ compare_less_hash (const struct hash_elem *a,
   return entry_a->vaddr < entry_b->vaddr;
 }
 
-/* Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
-   If the entry already exists, replaces it with its new value. */
-void
+// Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
+
+bool
 spt_insert(struct hash *spt, struct spt_entry *entry)
 {
   struct hash_elem *elem;
   lock_acquire(&spt_lock);
   elem = hash_insert(spt, &entry->elem);
+  if (elem == NULL) {
+    lock_release(&spt_lock);
+    return true;
+  }
   lock_release(&spt_lock);
+  return false;
+
 }
 
 bool
@@ -60,7 +66,7 @@ spt_insert_all_zero(void *uaddr)
 
   struct thread *cur = thread_current();
   struct hash_elem *elem;
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREEEE.
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREE.
   lock_acquire(&spt_lock);
   if (entry == NULL) {
 	  return false;
@@ -76,9 +82,11 @@ spt_insert_all_zero(void *uaddr)
   return false;
 }
 
-
+/* Used to insert an FSYS or a MMAP file into the supplementary page table.
+   If MMAP bool is true, it is MMAP we are inserting, otherwise it is FSYS. */
 bool
-spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset)
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset, bool writable,
+            bool mmap, bool executable)
 {
 
   struct thread *cur = thread_current();
@@ -92,8 +100,16 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   entry->file_info.offset = offset;
   entry->file_info.size = size;
   entry->file_info.zeros = zeros;
-  entry->info = FSYS;
+  entry->file_info.writable = writable;
+  entry->file_info.executable = executable;
   entry->vaddr = uaddr;
+
+  if (mmap) {
+      entry->info = MMAP;
+  } else {
+      entry->info = FSYS;
+  }
+
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
   if (elem == NULL) {
 	  lock_release(&spt_lock);
@@ -103,7 +119,8 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   return false;
 }
 
-/* Returns the spt_entry from the supplemental_page_table given the virtual address of the page */
+/* Returns the spt_entry from the supplemental_page_table given the virtual
+   address of the page */
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
@@ -111,12 +128,8 @@ get_spt_entry(struct hash *table, void *address)
 	entry.vaddr = address;
 	lock_acquire(&spt_lock);
 	struct hash_elem *elem = hash_find(table, &entry.elem);
-	if (elem == NULL) {
-    lock_release(&spt_lock);
-    return NULL;
-  }
   lock_release(&spt_lock);
-
+  
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
@@ -124,8 +137,13 @@ get_spt_entry(struct hash *table, void *address)
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	//struct thread *cur = thread_current();
+	struct thread *cur = thread_current();
+
 	swap_out(page, spt_entry->swap_slot);
+    bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
+    if (!success) {
+        frame_free(page);
+    }
 }
 
 void
@@ -135,7 +153,7 @@ load_file(void *kpage, struct spt_entry *entry)
 	size_t page_read_bytes = entry->file_info.size;
 
 	/*Same as segment loop in exception.c*/
-  size_t bytes_actually_read = file_read_at(entry->file_info.f, 
+	size_t bytes_actually_read = file_read_at(entry->file_info.f,
                                   kpage, page_read_bytes, entry->file_info.offset);
 	if (bytes_actually_read != page_read_bytes)
 		{
@@ -145,14 +163,15 @@ load_file(void *kpage, struct spt_entry *entry)
 	// Should we keep a variable zero in file_info?
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
-	bool success = install_page(entry->vaddr, kpage, true);
-  if (!success) {
-    frame_free(kpage);
-  }
+	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
+	if (!success) {
+	    frame_free(kpage);
+	}
 
 
 }
 
+//TODO: Remove?
 void
 load_mmf(void *page UNUSED, struct spt_entry *entry UNUSED)
 {
@@ -166,18 +185,21 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
   // If page data is in swap slot, swap out, into the frame
   
   if (spt_entry->info == SWAP) {
+    // printf("SWAP\n");
     load_from_disk(page, spt_entry);
-
   // If page data is in file system, load file into frame 
   } else if (spt_entry->info == FSYS) {
+    // printf("FSYS\n");
     load_file(page, spt_entry);
 
   // If page data is in memory mapped files, load into frame
-  } else if (spt_entry->info == MMAP) {
-    load_mmf(page, spt_entry);
+  } else if (spt_entry->info == MMAP) { //TODO: MMAP just seems unnecessary now...
+    // printf("MMAP\n");
+    load_file(page, spt_entry);
 
   // If page should be all-zero, fill it with zeroes
   } else if (spt_entry->info == ALL_ZERO){
+    // printf("ZERO\n");
   	memset(page, 0, PGSIZE);
     install_page(spt_entry->vaddr, page, true);
   }
@@ -206,16 +228,19 @@ should_stack_grow(void *addr, void *esp)
 {
     bool heuristic;
     /* Check fault address doesn't pass stack limit growth. */
-    heuristic = (PHYS_BASE - pg_round_down(addr) <= STACK_LIMIT);
+    heuristic = (uint32_t) (PHYS_BASE - pg_round_down(addr)) <= STACK_LIMIT;
     /* Check fault address is above the limit of the stack minus the permission bytes. */
-    heuristic = addr >= esp - PUSHA_PERMISSION_BYTES;
+    heuristic &= addr >= esp - PUSHA_PERMISSION_BYTES;
+
     return heuristic;
 }
 
 void
 grow_stack(void *addr)
 {
+    // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
+    // TODO: Add to spt?
     /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }
@@ -242,6 +267,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-//    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
+    printf ("User virtual addr: %p frame: type: %s\n", entry->vaddr, entry->frame_addr, type);
   }
 }
