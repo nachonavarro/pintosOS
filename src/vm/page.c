@@ -126,9 +126,7 @@ get_spt_entry(struct hash *table, void *address)
 {
 	struct spt_entry entry;
 	entry.vaddr = address;
-	lock_acquire(&spt_lock);
 	struct hash_elem *elem = hash_find(table, &entry.elem);
-  lock_release(&spt_lock);
   
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
