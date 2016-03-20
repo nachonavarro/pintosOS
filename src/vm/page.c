@@ -131,7 +131,6 @@ get_spt_entry(struct hash *table, void *address)
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
-// TODO: Do we want to delete from hash table after swapping out?
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
@@ -162,11 +161,10 @@ load_file(void *kpage, struct spt_entry *entry)
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
 	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
-	if (!success) {
-	    frame_free(kpage);
-	}
 
-
+  if (!success) {
+    frame_free(kpage);
+  }
 }
 
 //TODO: Remove?

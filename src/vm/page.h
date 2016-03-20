@@ -27,11 +27,11 @@ struct file_info {
 
 struct spt_entry {
 	void   *vaddr;
-    void   *frame_addr;
-    size_t swap_slot;
-    enum page_info info;
-    struct file_info file_info;
-    struct hash_elem elem;
+  void   *frame_addr;
+  size_t swap_slot;
+  enum page_info info;
+  struct file_info file_info;
+  struct hash_elem elem;
 };
 
 void spt_init(struct hash *spt);

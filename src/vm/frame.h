@@ -20,12 +20,14 @@ struct fte {
   pid_t owner; /* pid of process that owns this frame. */
   struct list_elem fte_elem; /* To allow each frame to be added to 'static
                                   struct list frames' in 'frame.c'. */
+  uint64_t clock_counter;
 };
 
 void frame_table_init(void);
 void *frame_alloc(enum palloc_flags flags, void *upage);
 void frame_free(void *frame);
-struct fte *choose_frame_to_evict(void);
+struct fte *choose_frame_to_evict_random(void);
+struct fte *choose_frame_to_evict_snd_chance(void);
 void save_frame(struct fte *, void*);
 void *evict(void *upage);
 
