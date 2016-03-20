@@ -611,7 +611,7 @@ sys_mmap(int fd, void *addr)
     bytes_to_write = (i == (pages - 1)) ? (size % PGSIZE) : PGSIZE;
     /* Add current page to the supplementary page table. */
     spt_insert_file(cur_page, file, bytes_to_write,
-                          PGSIZE - bytes_to_write, i * PGSIZE, true, true);
+                          PGSIZE - bytes_to_write, i * PGSIZE, true, true, false);
   }
 
   mapid_t mapid = cur->next_mapid;

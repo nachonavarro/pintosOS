@@ -648,8 +648,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false;
         }
       } else {
-          if (!spt_insert_file(upage,file, page_read_bytes, 
-                page_zero_bytes, offset, writable, false)) {
+          if (!spt_insert_file(upage, file, page_read_bytes,
+                page_zero_bytes, offset, writable, false, true)) {
             return false; 
           }
       }
@@ -672,16 +672,9 @@ setup_stack (void **esp)
   bool success = false;
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  spt_insert_all_zero(upage);
 
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // REMEMBER TO FREE.
-  if (entry == NULL) {
-	  return false;
-  }
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
-  entry->frame_addr = kpage;
-  entry->vaddr = upage;
-  entry->info = ALL_ZERO;
-  spt_insert(&thread_current()->supp_pt, entry);
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);

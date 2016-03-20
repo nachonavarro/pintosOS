@@ -188,7 +188,7 @@ page_fault (struct intr_frame *f)
   // Fetching the data into the frame
   if (entry != NULL) {
     entry->frame_addr = kpage;
-	  load_into_page(kpage, entry);
+	load_into_page(kpage, entry);
   }
 
 

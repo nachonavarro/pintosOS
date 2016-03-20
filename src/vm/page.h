@@ -19,13 +19,14 @@ struct file_info {
 	struct file *f;
 	size_t offset;
 	size_t size;
-  size_t zeros;
-  size_t writable;
+	size_t zeros;
+	size_t writable;
+	bool executable;
 };
 
 
 struct spt_entry {
-	  void   *vaddr;
+	void   *vaddr;
     void   *frame_addr;
     size_t swap_slot;
     enum page_info info;
@@ -36,7 +37,7 @@ struct spt_entry {
 void spt_init(struct hash *spt);
 bool spt_insert(struct hash *spt, struct spt_entry *entry);
 bool spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros,
-                     size_t offset, bool writable, bool mmap);
+                     size_t offset, bool writable, bool mmap, bool executable);
 bool spt_insert_all_zero(void *uaddr);
 struct spt_entry* get_spt_entry(struct hash *table, void *address);
 void spt_destroy(struct hash *hashmap);

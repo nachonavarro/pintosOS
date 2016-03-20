@@ -85,7 +85,8 @@ spt_insert_all_zero(void *uaddr)
 /* Used to insert an FSYS or a MMAP file into the supplementary page table.
    If MMAP bool is true, it is MMAP we are inserting, otherwise it is FSYS. */
 bool
-spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset, bool writable, bool mmap)
+spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t offset, bool writable,
+            bool mmap, bool executable)
 {
 
   struct thread *cur = thread_current();
@@ -100,8 +101,15 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   entry->file_info.size = size;
   entry->file_info.zeros = zeros;
   entry->file_info.writable = writable;
-  entry->info = mmap ? MMAP : FSYS;
+  entry->file_info.executable = executable;
   entry->vaddr = uaddr;
+
+  if (mmap) {
+      entry->info = MMAP;
+  } else {
+      entry->info = FSYS;
+  }
+
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
   if (elem == NULL) {
 	  lock_release(&spt_lock);
@@ -130,11 +138,12 @@ void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
 	struct thread *cur = thread_current();
- 	bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
-  if (!success) {
-    frame_free(page);
-  }
+
 	swap_out(page, spt_entry->swap_slot);
+    bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
+    if (!success) {
+        frame_free(page);
+    }
 }
 
 void
@@ -144,7 +153,7 @@ load_file(void *kpage, struct spt_entry *entry)
 	size_t page_read_bytes = entry->file_info.size;
 
 	/*Same as segment loop in exception.c*/
-  size_t bytes_actually_read = file_read_at(entry->file_info.f, 
+	size_t bytes_actually_read = file_read_at(entry->file_info.f,
                                   kpage, page_read_bytes, entry->file_info.offset);
 	if (bytes_actually_read != page_read_bytes)
 		{
@@ -155,9 +164,9 @@ load_file(void *kpage, struct spt_entry *entry)
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
 	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
-  if (!success) {
-    frame_free(kpage);
-  }
+	if (!success) {
+	    frame_free(kpage);
+	}
 
 
 }
