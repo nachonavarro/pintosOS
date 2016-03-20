@@ -131,7 +131,6 @@ get_spt_entry(struct hash *table, void *address)
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
-// TODO: Do we want to delete from hash table after swapping out?
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
@@ -162,11 +161,10 @@ load_file(void *kpage, struct spt_entry *entry)
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
 	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
-	if (!success) {
-	    frame_free(kpage);
-	}
 
-
+  if (!success) {
+    frame_free(kpage);
+  }
 }
 
 //TODO: Remove?
@@ -217,6 +215,7 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
+  frame_free(entry->frame_addr);
   free(entry);
 }
 
@@ -238,7 +237,9 @@ grow_stack(void *addr)
 {
     // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
-    // TODO: Add to spt?
+    struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt,
+                                                        addr);
+    entry->frame_addr = page;
     /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }
@@ -265,6 +266,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-    printf ("User virtual addr: %p frame: type: %s\n", entry->vaddr, entry->frame_addr, type);
+    printf ("frame: %p User virtual addr: %p type: %s\n", entry->frame_addr, entry->vaddr, type);
   }
 }
