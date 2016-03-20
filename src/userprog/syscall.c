@@ -551,6 +551,7 @@ sys_mmap(int fd, void *addr)
     return ERROR;
   }
 
+  //TODO: DO WE EVEN NEED TO DO THIS
 //  /* num_stack_pages is number of pages for the stack for this process, I
 //     think. However, could probably use the esp of the current thread, and then
 //     simply compare this with ADDR. */
