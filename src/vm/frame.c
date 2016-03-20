@@ -11,6 +11,7 @@ static struct lock frame_table_lock;
 
 static bool add_frame(void *frame, void *upage);
 static void remove_frame(void *frame);
+static void debug_frame(void);
 
 /* Initialise the actual frame table itself, along with any locks required in
    accessing the frame table. */
@@ -50,8 +51,6 @@ frame_alloc(enum palloc_flags flags, void *upage) {
     /* Otherwise, we can simply add the frame to the frame
        table (in an fte). */
     add_frame(frame, upage);
-    //TODO: What do we do if add_frame() can't malloc enough space and
-    //      returns false? Panic?
   }
 
   /* Return the kernel virtual address of the actual frame in the fte. */
@@ -109,7 +108,6 @@ save_frame(struct fte *frame)
 }
 
 
-
 /* Creates a frame that will contain a pointer to the given page, and adds
    this frame to the frame table. Returns true if frame was successfully
    added, or false otherwise (i.e. if there was not enough memory to
@@ -118,6 +116,9 @@ static bool
 add_frame(void *frame, void *upage) {
   /* Frame is freed in remove_frame(). */
   struct fte *fte = malloc(sizeof(struct fte));
+  if (fte == NULL) {
+      PANIC("System can not allocate more frames.");
+  }
 
   /* Return false if struct fte could not be successfully malloc'd. */
   if (fte == NULL) {
@@ -168,3 +169,20 @@ remove_frame(void *frame) {
   }
   lock_release(&frame_table_lock);
 }
+
+static void
+debug_frame(void) {
+    int ftes = list_size(&frame_table);
+    struct list_elem *e;
+    int count = 0;
+    printf("-----------------------------------\n\n");
+    for (e = list_begin (&frame_table); e != list_end (&frame_table); e = list_next (e)) {
+        count++;
+        struct fte *fte = list_entry(e, struct fte, fte_elem);
+        printf("%d: frame is: %p, vaddr is: %p, thread owner is: %d.\n", count, fte->frame, fte->upage, fte->owner);
+    }
+    printf("-----------------------------------\n\n");
+}
+
+
+
