@@ -116,13 +116,13 @@ kill (struct intr_frame *f)
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
+
 static void
 page_fault (struct intr_frame *f) 
 {
-
   bool not_present;  /* True: not-present page, false: writing r/o page. */
-  bool write;        /* True: access was write, false: access was read. */
-  bool user;         /* True: access by user, false: access by kernel. */
+  // bool write;        /* True: access was write, false: access was read. 
+  // bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
   /* Obtain faulting address, the virtual address that was
@@ -140,8 +140,9 @@ page_fault (struct intr_frame *f)
 
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
-  write = (f->error_code & PF_W) != 0;
-  user = (f->error_code & PF_U) != 0;
+  // TODO: Use this information?
+  // write = (f->error_code & PF_W) != 0;
+  // user = (f->error_code & PF_U) != 0;
 
   /* Count page faults. */
   page_fault_cnt++;
@@ -156,7 +157,6 @@ page_fault (struct intr_frame *f)
     cur->exit_status = ERROR;
     sys_exit(ERROR);
   }
-
 
   // Locate page that faulted in SPT
 
@@ -188,11 +188,8 @@ page_fault (struct intr_frame *f)
   // Fetching the data into the frame
   if (entry != NULL) {
     entry->frame_addr = kpage;
-	load_into_page(kpage, entry);
+	  load_into_page(kpage, entry);
   }
-
-
-
 
   // TODO: Delete following lines?
 

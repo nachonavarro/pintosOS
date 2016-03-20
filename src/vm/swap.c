@@ -59,6 +59,7 @@ swap_out(void *buf, size_t swap_slot)
                 SECTORS_PER_PAGE * swap_slot + i, 
                   buf + i * BLOCK_SECTOR_SIZE);
         }
+    free(swap_slot);
 }
 
 

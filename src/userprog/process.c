@@ -681,8 +681,7 @@ setup_stack (void **esp)
   entry->info = ALL_ZERO;
   entry->vaddr = upage;
   entry->frame_addr = kpage;
-  struct hash_elem *elem;
-  elem = hash_insert(&thread_current()->supp_pt, &entry->elem); //Should check null?
+  struct hash_elem *elem = hash_insert(&thread_current()->supp_pt, &entry->elem); //Should check null?
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);

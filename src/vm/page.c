@@ -43,23 +43,6 @@ compare_less_hash (const struct hash_elem *a,
   return entry_a->vaddr < entry_b->vaddr;
 }
 
-// Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
-
-bool
-spt_insert(struct hash *spt, struct spt_entry *entry)
-{
-  struct hash_elem *elem;
-  lock_acquire(&spt_lock);
-  elem = hash_insert(spt, &entry->elem);
-  if (elem == NULL) {
-    lock_release(&spt_lock);
-    return true;
-  }
-  lock_release(&spt_lock);
-  return false;
-
-}
-
 bool
 spt_insert_all_zero(void *uaddr)
 {
@@ -134,8 +117,6 @@ get_spt_entry(struct hash *table, void *address)
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	struct thread *cur = thread_current();
-
 	swap_out(page, spt_entry->swap_slot);
     bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
     if (!success) {
@@ -146,7 +127,6 @@ load_from_disk(void *page, struct spt_entry *spt_entry)
 void
 load_file(void *kpage, struct spt_entry *entry)
 {
-	struct thread *cur = thread_current();
 	size_t page_read_bytes = entry->file_info.size;
 
 	/*Same as segment loop in exception.c*/
@@ -171,7 +151,7 @@ load_file(void *kpage, struct spt_entry *entry)
 void
 load_mmf(void *page UNUSED, struct spt_entry *entry UNUSED)
 {
-    return;
+    return; 
 }
 
 // Loads the data into PAGE from its location in SPT_ENTRY
@@ -215,10 +195,6 @@ static void
 hash_free_elem (struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_entry *entry = hash_entry(e, struct spt_entry, elem);
-  //TODO: Took out frame_free here because it broke ALL tests
- // if (in_memory) {
-   // frame_free(entry->frame_addr);
- // }
   free(entry);
 }
 
@@ -240,10 +216,6 @@ grow_stack(void *addr)
 {
     // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
-    //TODO: Below 3 lines have been commented out as they broke stack tests
-//    struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt,
-//                                                        addr);
-//    entry->frame_addr = page;
     /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }

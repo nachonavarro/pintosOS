@@ -78,13 +78,10 @@ choose_frame_to_evict_random(void)
   int random_fte = random_ulong() % ftes; //Random number between 0 and (size - 1) inclusive.
   ASSERT(random_fte >= 0 && random_fte < ftes);
   struct list_elem *e;
-  struct fte *fte;
   for (e = list_begin(&frame_table); random_fte > 0; random_fte--) {
     e = list_next(e);
-    fte = list_entry(e, struct fte, fte_elem);
-    //printf("frame is %p, upage is %p, owner is %d \n",fte->frame, fte->upage, fte->owner);
   }
-
+  struct fte *fte = list_entry(e, struct fte, fte_elem);
   return fte;
 }
 
@@ -147,7 +144,6 @@ evict(void *upage) {
 void
 save_frame(struct fte *frame, void *upage)
 {
-//  printf("TID OWNER: %d\n", frame->owner);
   struct thread *t = tid_to_thread((tid_t) frame->owner);
   ASSERT(t != NULL);
   struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage);
@@ -156,7 +152,7 @@ save_frame(struct fte *frame, void *upage)
   entry->frame_addr = frame->frame;
   ASSERT(entry != NULL);
   ASSERT(frame->upage == entry->vaddr);
-  bool dirty = pagedir_is_dirty(&t->supp_pt, entry->vaddr);
+  bool dirty = pagedir_is_dirty(t->pagedir, entry->vaddr);
   if (entry->file_info.executable && entry->info == FSYS) {
       entry->info = SWAP;
   }
@@ -240,15 +236,12 @@ remove_frame(void *frame) {
 
 void
 debug_frame(void) {
-    int ftes = list_size(&frame_table);
     struct list_elem *e;
     int count = 0;
     printf("-----------------------------------\n\n");
     for (e = list_begin (&frame_table); e != list_end (&frame_table); e = list_next (e)) {
         count++;
         struct fte *fte = list_entry(e, struct fte, fte_elem);
-        struct thread *t = tid_to_thread((tid_t) fte->owner);
-        struct spt_entry *entry = get_spt_entry(&t->supp_pt, fte->upage);
         printf("%d: frame is: %p, vaddr is: %p, thread owner is: %d.\n", count, fte->frame, fte->upage, fte->owner);
     }
     printf("-----------------------------------\n\n");
