@@ -218,9 +218,9 @@ should_stack_grow(void *addr, void *esp)
 {
     bool heuristic;
     /* Check fault address doesn't pass stack limit growth. */
-    heuristic = (((uint32_t) PHYS_BASE) - ((uint32_t) pg_round_down(addr))) <= STACK_LIMIT;
+    heuristic = (uint32_t) (PHYS_BASE - pg_round_down(addr)) <= STACK_LIMIT;
     /* Check fault address is above the limit of the stack minus the permission bytes. */
-    heuristic &= ((uint32_t) addr) >= ((uint32_t) esp) - PUSHA_PERMISSION_BYTES;
+    heuristic &= addr >= esp - PUSHA_PERMISSION_BYTES;
 
     return heuristic;
 }
@@ -257,6 +257,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-    printf ("Vaddr: %p Type: %s\n", entry->vaddr, type);
+    printf ("User virtual addr: %p frame: type: %s\n", entry->vaddr, entry->frame_addr, type);
   }
 }
