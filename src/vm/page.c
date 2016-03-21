@@ -43,23 +43,6 @@ compare_less_hash (const struct hash_elem *a,
   return entry_a->vaddr < entry_b->vaddr;
 }
 
-// Inserts a spt_entry ENTRY into the supplemental_page_table SPT.
-
-bool
-spt_insert(struct hash *spt, struct spt_entry *entry)
-{
-  struct hash_elem *elem;
-  lock_acquire(&spt_lock);
-  elem = hash_insert(spt, &entry->elem);
-  if (elem == NULL) {
-    lock_release(&spt_lock);
-    return true;
-  }
-  lock_release(&spt_lock);
-  return false;
-
-}
-
 bool
 spt_insert_all_zero(void *uaddr)
 {
@@ -126,19 +109,14 @@ get_spt_entry(struct hash *table, void *address)
 {
 	struct spt_entry entry;
 	entry.vaddr = address;
-	lock_acquire(&spt_lock);
 	struct hash_elem *elem = hash_find(table, &entry.elem);
-  lock_release(&spt_lock);
   
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
-// TODO: Do we want to delete from hash table after swapping out?
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	struct thread *cur = thread_current();
-
 	swap_out(page, spt_entry->swap_slot);
     bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
     if (!success) {
@@ -149,7 +127,6 @@ load_from_disk(void *page, struct spt_entry *spt_entry)
 void
 load_file(void *kpage, struct spt_entry *entry)
 {
-	struct thread *cur = thread_current();
 	size_t page_read_bytes = entry->file_info.size;
 
 	/*Same as segment loop in exception.c*/
@@ -164,18 +141,17 @@ load_file(void *kpage, struct spt_entry *entry)
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
 	// Not sure if true should always be set.
 	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
-	if (!success) {
-	    frame_free(kpage);
-	}
 
-
+  if (!success) {
+    frame_free(kpage);
+  }
 }
 
 //TODO: Remove?
 void
 load_mmf(void *page UNUSED, struct spt_entry *entry UNUSED)
 {
-    return;
+    return; 
 }
 
 // Loads the data into PAGE from its location in SPT_ENTRY
@@ -240,7 +216,6 @@ grow_stack(void *addr)
 {
     // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
-    // TODO: Add to spt?
     /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }
@@ -267,6 +242,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-    printf ("User virtual addr: %p frame: type: %s\n", entry->vaddr, entry->frame_addr, type);
+    printf ("frame: %p User virtual addr: %p type: %s\n", entry->frame_addr, entry->vaddr, type);
   }
 }

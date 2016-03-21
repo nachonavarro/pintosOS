@@ -12,7 +12,7 @@ enum page_info {
 	SWAP,
 	FSYS,
 	MMAP,
-  ALL_ZERO
+	ALL_ZERO
 };
 
 struct file_info {
@@ -27,15 +27,15 @@ struct file_info {
 
 struct spt_entry {
 	void   *vaddr;
-    void   *frame_addr;
-    size_t swap_slot;
-    enum page_info info;
-    struct file_info file_info;
-    struct hash_elem elem;
+  void   *frame_addr;
+  size_t swap_slot;
+  enum page_info info;
+  struct file_info file_info;
+  struct hash_elem elem;
+  bool in_memory;
 };
 
 void spt_init(struct hash *spt);
-bool spt_insert(struct hash *spt, struct spt_entry *entry);
 bool spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros,
                      size_t offset, bool writable, bool mmap, bool executable);
 bool spt_insert_all_zero(void *uaddr);

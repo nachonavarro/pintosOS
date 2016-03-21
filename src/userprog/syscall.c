@@ -668,6 +668,7 @@ sys_munmap(mapid_t mapping)
   lock_release(&cur->mmap_table_lock);
 }
 
+/* Called from hash_clear(). Does most of what sys_munmap() does. */
 void
 munmap_exiting(struct hash_elem *e, void *aux UNUSED) {
   struct mmap_mapping *mmap = hash_entry(e, struct mmap_mapping, hash_elem);
@@ -765,16 +766,12 @@ get_word_on_stack(struct intr_frame *f, int offset)
 /* If supplied pointer is a null pointer, not in the user address space, or
    is an unmapped virtual address, the process is terminated. */
 
-/* TODO: Fix edge case by checking pointer is not an unmapped virtual address
-   Could use get_spt_entry(&t->supp_pt, uaddr) == NULL but does not work */
 static void
 check_mem_ptr(const void *uaddr) 
 {
-  struct thread *t = thread_current(); 
   if (uaddr == NULL || !is_user_vaddr(uaddr)) {
     sys_exit(ERROR);
   }
-    
 }
 
 /* Checks that all of the buffer that we are writing/reading from is valid. */

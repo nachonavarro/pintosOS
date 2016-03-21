@@ -8,7 +8,8 @@
 //      process has a mmap_table and next_mapid, and flushing and resetting
 //      next_mapid is only necessary when process exits.
 
-static void free_using_hash_elem(struct hash_elem *, void*);
+// TODO: Define this function?
+// static void free_using_hash_elem(struct hash_elem *, void*);
 
 /* Malloc's space for a struct mmap_mapping and sets all of its members,
    before inserting it into mmap_table. Returns false if not enough
