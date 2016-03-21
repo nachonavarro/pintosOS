@@ -73,6 +73,65 @@
 
 \subsubsection{Purpose of Supplemental Page Table Data Structures}
 
+\begin{enumerate}
+\item
+\begin{lstlisting}
+enum page_info {
+	SWAP,
+	FSYS,
+	MMAP,
+	ALL_ZERO
+};
+\end{lstlisting}
+
+\item
+\begin{lstlisting}
+struct file_info {
+	struct file *f;
+	size_t offset;
+	size_t size;
+	size_t zeros;
+	size_t writable;
+	bool executable;
+};
+\end{lstlisting}
+
+\item
+\begin{lstlisting}
+struct spt_entry {
+  void   *vaddr;
+  void   *frame_addr;
+  size_t swap_slot;
+  enum page_info info;
+  struct file_info file_info;
+  struct hash_elem elem;
+  bool in_memory;
+};
+\end{lstlisting}
+
+\item
+\begin{lstlisting}
+static struct lock spt_lock;
+\end{lstlisting}
+
+\end{enumerate}´
+
+\begin{enumerate}
+\item \texttt{page\_ info}: Enum describing the type of page.
+\item \texttt{file\_info}: Struct with information regarding files. It contains the file in question, the offset to start reading or writing, the size to read or write, the number of zeros in the file, if it is writable or not, and if it is executable (we will need this boolean since executables are stored in swap space).
+\item \texttt{spt\_entry}: Main struct used in the supplemental page table that records the following information of each page in virtual memory:
+\begin{itemize}
+\item \lstinline{void *vaddr}: The starting address of the virtual page.
+\item \lstinline{void *frame_addr}: The corresponding frame address that the virtual page maps to.
+\item \lstinline{size_t swap_slot}: The swap slot where the data is saved (if swapped).
+\item \lstinline{enum page_info info}: Information regarding the type of page and where it is stored if it is not in main memory.
+\item \lstinline{struct file_info file_info}:  Information regarding the file stored in this virtual page (if any).
+\item \lstinline{struct hash_elem elem}: Element for the hashtable.
+\item \lstinline{bool in_memory}: Boolean that keeps track if the page is in memory or not.
+\end{itemize}´
+\item \lstinline{struct lock spt_lock}: Lock to avoid race conditions in our supplemental page table.
+\end{enumerate}´
+
 \subsection{Algorithms}
 
 \subsubsection{Locating Frame for Given Page}
@@ -84,6 +143,18 @@ Each process' supplemental page table is a hash table mapping between page addre
 \subsection{Synchronisation}
 
 \subsubsection{Race When Getting a New Frame}
+We can divide this question in two parts:
+\begin{enumerate}
+\item When there are free frames available, a race condition is avoided by inserting a lock when the frame is added to the frame table via \lstinline{list_push_back}. This ensures that the frame is properly added to the table. Hence, we insert this code:
+
+\begin{lstlisting}
+lock_acquire(&frame_table_lock);
+list_push_back(&frame_table, &fte->fte_elem);
+lock_release(&frame_table_lock);
+\end{lstlisting}
+
+\item When there aren't any free frames available, we avoid a race condition by again inserting a lock but this time in our eviction function, since we need to avoid a potential race condition where both processes choose the same frame to evict. Thus, having a lock in \lstinline{evict()} avoids this race condition.
+\end{enumerate}´
 
 \subsection{Rationale}
 
@@ -120,6 +191,16 @@ struct fte {
 \begin{lstlisting}
 static struct list frame_table;
 static struct lock frame_table_lock;
+\end{lstlisting}
+
+\item
+\begin{lstlisting}
+struct lock swap_lock;
+\end{lstlisting}
+
+\item
+\begin{lstlisting}
+static struct bitmap *swap_bitmap;
 \end{lstlisting}
 
 \end{enumerate}
@@ -166,6 +247,10 @@ The \texttt{list\_elem} member allows each \texttt{fte} to be added to the frame
 
 \end{itemize}
 
+\item \lstinline{struct lock swap_lock}: Lock to protect reading and writing in the swap space.
+
+\item \lstinline{struct bitmap *swap_bitmap;}: Main data structure used in swapping. A bitmap that is set to true if the corresponding slot is occupied in swap space by a page and false if it is empty.
+
 \end{enumerate}
 
 \subsection{Algorithms}
@@ -174,7 +259,17 @@ The \texttt{list\_elem} member allows each \texttt{fte} to be added to the frame
 
 \subsubsection{Adjusting Data Structures when Losing a Frame}
 
+
 \subsubsection{Heuristic for Stack Growth}
+Our heuristic consists of two simple checks. The first check is that stack size is below our \lstinline{STACK_LIMIT} which we set by design to be 8 megabytes. To check this we just see if the beginning of the stack (\lstinline{PHYS_BASE}) minus the last page of the stack \lstinline{pg_round_down(addr)} is still less than the limit. Our second check is the main heuristic. Since a PUSHA instruction may page fault 32 bytes below the stack pointer and still be a legal access, we have decided to set the limit to precisely the stack pointer minus 32 bytes. All accesses below that will be invalid, but accesses between the stack pointer and the stack pointer minus 32 are valid since either PUSH or PUSHA require some permission bytes below the stack pointer and are still valid. In pseudo-code:
+
+\begin{lstlisting}
+    bool heuristic;
+    /* Check fault address doesn't pass stack limit growth. */
+    heuristic = (uint32_t) (PHYS_BASE - pg_round_down(addr)) <= STACK_LIMIT;
+    /* Check fault address is above the limit of the stack minus the permission bytes. */
+    heuristic &= addr >= esp - PUSHA_PERMISSION_BYTES;
+\end{lstlisting}
 
 \subsection{Synchronisation}
 
@@ -281,7 +376,15 @@ The first member is \texttt{mmap\_table} - the actual hash table for the memory 
 
 \subsubsection{Integrating Memory Mapped Files into Virtual Memory Subsystem}
 
-Memory mapped files integrate quite seamlessly into our virtual memory subsystem. On a call to \texttt{sys\_mmap()}, each page of the memory mapped file will be inserted into the supplementary page table using \texttt{spt\_insert\_file()}, just as if it was a normal file that wasn't memory mapped. This means that the memory mapped file is ready to be lazily loaded just like any other entries in the supplementary page table.
+Memory mapped files integrate quite seamlessly into our virtual memory subsystem. On a call to \texttt{sys\_mmap()}, each page of the memory mapped file will be inserted into the supplementary page table using \texttt{spt\_insert\_file()}, just as if it was a normal file that wasn't memory mapped. This means that the memory mapped file is ready to be lazily loaded just like any other entries in the supplementary page table. The page fault and the eviction processes differ between swap pages and other pages through the use of an enum in each supplemental page table entry. This enum, \lstinline{info}, can be either swap, file, or all zeros. This way when we lazy load we can set one or the other and when there is a page fault or eviction we act accordingly by simply checking the info. In pseudo code we do something like:
+
+\begin{lstlisting}
+if (spt_entry->info == SWAP) {
+    // Do something specific to swap.
+} else if (spt_entry->info == FSYS) {
+    // Do something related to the file system.
+}
+\end{lstlisting}
 
 \subsubsection{Overlapping File Mapping}
 
