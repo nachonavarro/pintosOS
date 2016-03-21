@@ -356,7 +356,7 @@ sys_read(int fd, void *buffer, unsigned size, struct intr_frame *f)
   for (; buf_iter <= buffer + size; buf_iter += PGSIZE) {
     struct spt_entry *entry = get_spt_entry(&thread_current()->supp_pt, buf_iter);
     if (entry == NULL && should_stack_grow(buf_iter, f->esp)) {
-        grow_stack(buf_iter); 
+      grow_stack(buf_iter);
     } 
   }
 
@@ -510,7 +510,6 @@ sys_close(int fd)
   lock_release(&secure_file);
 }
 
-//TODO: "Your VM system must lazily load pages in mmap regions"
 /* Maps the file open as FD into the process' virtual address space - entire
    file mapped into consecutive virtual pages starting at ADDR. (Lazy load
    pages in mmap regions). (Evicting a page mapped by mmap writes it back to
@@ -550,19 +549,10 @@ sys_mmap(int fd, void *addr)
     return ERROR;
   }
 
-  //TODO: DO WE EVEN NEED TO DO THIS
-//  /* num_stack_pages is number of pages for the stack for this process, I
-//     think. However, could probably use the esp of the current thread, and then
-//     simply compare this with ADDR. */
-//  int num_stack_pages = 0; //TODO: Change from 0
-//  if (addr > PHYS_BASE - (num_stack_pages*PGSIZE)) {
-//    return ERROR;
-//  }
-
   /* If ADDR is not in user/process address space, we cannot map
-       the file there. */
+     the file there. */
   if (!is_user_vaddr(addr)) {
-    sys_exit(ERROR); //TODO: Not sure whether to return ERROR instead
+    sys_exit(ERROR);
   }
 
   /* Pages is number of pages needed to map file.
@@ -602,7 +592,7 @@ sys_mmap(int fd, void *addr)
     cur_page = (void *) ((uint8_t *) addr) + (i * PGSIZE);
     /* Check to see if there is an existing mapped page at what would be the
        i'th page of this mapped file. */
-    if (get_spt_entry(spt, cur_page) != NULL) { //TODO: Pretty sure this should be != NULL, but when it was == NULL, some more tests fail, but some more pass (I think) - double check this please
+    if (get_spt_entry(spt, cur_page) != NULL) {
       return ERROR;
     }
     /* Only on the last page do we potentially not fill up whole page with
@@ -610,7 +600,7 @@ sys_mmap(int fd, void *addr)
     bytes_to_write = (i == (pages - 1)) ? (size % PGSIZE) : PGSIZE;
     /* Add current page to the supplementary page table. */
     spt_insert_file(cur_page, file, bytes_to_write,
-                          PGSIZE - bytes_to_write, i * PGSIZE, true, true, false);
+                       PGSIZE - bytes_to_write, i * PGSIZE, true, true, false);
   }
 
   mapid_t mapid = cur->next_mapid;
@@ -619,7 +609,8 @@ sys_mmap(int fd, void *addr)
      since we have thread_current() here already it makes sense to lock here
      rather than in mmap_table_insert() in mmap.c. */
   lock_acquire(&cur->mmap_table_lock);
-  bool success = mmap_table_insert(mmap_table, addr, addr + size, pages, mapid, file);
+  bool success = mmap_table_insert(mmap_table, addr, addr + size, pages,
+                                     mapid, file);
   lock_release(&cur->mmap_table_lock);
 
   /* Return -1 if mmap_table_insert wasn't successful (meaning there isn't
@@ -719,11 +710,10 @@ pages_munmap(struct mmap_mapping *mmap) {
       lock_release(&secure_file);
     }
 
-    //TODO: Change this to spt_remove(page from spt), so free() is called on
-    //      appropriate stuff and better abstraction - Just waiting for this
-    //      function to be implemented.
+    /* Remove from process' list of virtual pages. */
     struct spt_entry *entry = get_spt_entry(spt, page_uaddr);
     hash_delete(spt, &entry->elem);
+    free(entry);
 
     /* Advance to the next page. */
     page_uaddr += PGSIZE;
@@ -762,9 +752,9 @@ get_word_on_stack(struct intr_frame *f, int offset)
   return word;
 }
 
-/* If supplied pointer is a null pointer, not in the user address space, or
-   is an unmapped virtual address, the process is terminated. */
-
+/* If supplied pointer is a null pointer or not in the user address space
+   the process is terminated. If it is an unmapped virtual address, it is fine,
+   due to lazy loading. */
 static void
 check_mem_ptr(const void *uaddr) 
 {

@@ -334,11 +334,9 @@ process_exit (void)
   }
   file_close(cur->exec_file);
 #ifdef VM
-
   /* Frees resources of all entries in the mmap_table, as well as freeing the
      memory allocated for the table itself. */
   hash_destroy(&cur->mmap_table, munmap_exiting);
-  //TODO: May need to free more resources from the supplemental table
   /* Free process resources and destroy its supplemental page table. */
   spt_destroy(&cur->supp_pt);
 #endif
@@ -537,7 +535,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
               if (!load_segment (file, file_page, (void *) mem_page,
-                                 read_bytes, zero_bytes, writable)){
+                                 read_bytes, zero_bytes, writable)) {
             	  goto done;
               }
 
@@ -648,10 +646,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false;
         }
       } else {
-          if (!spt_insert_file(upage, file, page_read_bytes,
+        if (!spt_insert_file(upage, file, page_read_bytes,
                 page_zero_bytes, offset, writable, false, true)) {
-            return false; 
-          }
+          return false;
+        }
       }
 
       /* Advance. */
@@ -674,15 +672,15 @@ setup_stack (void **esp)
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
 
   kpage = frame_alloc(PAL_USER | PAL_ZERO, upage);
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREE.
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry));
   if (entry == NULL) {
-      return false;
+    return false;
   }
   entry->info = ALL_ZERO;
   entry->vaddr = upage;
   entry->frame_addr = kpage;
   struct thread *t = thread_current();
-  struct hash_elem *elem = hash_insert(&t->supp_pt, &entry->elem); //Should check null?
+  struct hash_elem *elem = hash_insert(&t->supp_pt, &entry->elem);
   if (kpage != NULL) 
     {
       success = install_page (upage, kpage, true);
@@ -712,8 +710,6 @@ install_page (void *upage, void *kpage, bool writable)
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-
-  // TODO: Change these to spt_get_entry and spt_insert??
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }

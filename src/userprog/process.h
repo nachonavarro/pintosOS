@@ -3,7 +3,6 @@
 
 #include "threads/thread.h"
 
-
 typedef int pid_t;
 
 tid_t process_execute (const char *file_name);

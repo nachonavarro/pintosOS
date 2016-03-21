@@ -16,8 +16,6 @@ struct mmap_mapping {
                     needed. */
   void *start_uaddr; /* Start address that file is mapped to. */
   void *end_uaddr; /* End address that file is mapped to. */
-  //TODO: For eviction, having a file descriptor here may be better?
-  //      Maybe we need both
   struct file *file; /* File that is mapped. Not the same struct as in
                         another mmap_mapping for same file, as
                         file_reopen() is used. */

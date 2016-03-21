@@ -14,7 +14,8 @@ struct fte {
   pid_t owner; /* pid of process that owns this frame. */
   struct list_elem fte_elem; /* To allow each frame to be added to 'static
                                   struct list frames' in 'frame.c'. */
-  uint64_t clock_counter;
+  uint64_t clock_counter; /* Allows us to order the frame table for the second
+                             chance eviction algorithm. */
 };
 
 void frame_table_init(void);

@@ -45,17 +45,10 @@ void spt_destroy(struct hash *hashmap);
 void load_into_page(void *page, struct spt_entry *entry);
 void load_from_disk(void *page, struct spt_entry *entry);
 void load_file(void *page, struct spt_entry *entry);
-void load_mmf(void *page, struct spt_entry *entry);
 bool install_page(void *upage, void *kpage, bool writable);
 
 bool should_stack_grow(void *uaddr, void *esp);
 void grow_stack(void *addr);
 void hashtable_debug(void);
-
-
-// void spt_modify(struct hash *spt, struct spt_entry *entry)
-// TODO: do we need this? or when we insert an already existing spt_elem, it modifies it to its new value?
-
-
 
 #endif /* vm/page.h */

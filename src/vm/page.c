@@ -48,19 +48,19 @@ spt_insert_all_zero(void *uaddr)
 {
   struct thread *cur = thread_current();
   struct hash_elem *elem;
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREE.
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry));
   lock_acquire(&spt_lock);
   if (entry == NULL) {
-	  return false;
+    return false;
   }
   entry->info = ALL_ZERO;
   entry->vaddr = uaddr;
   entry->in_memory = false;
   entry->file_info.writable = true;
-  elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
+  elem = hash_insert(&cur->supp_pt, &entry->elem);
   if (elem == NULL) {
-	  lock_release(&spt_lock);
-	  return true;
+    lock_release(&spt_lock);
+    return true;
   }
   lock_release(&spt_lock);
   return false;
@@ -75,10 +75,10 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
 
   struct thread *cur = thread_current();
   struct hash_elem *elem;
-  struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREEEE.
+  struct spt_entry *entry = malloc(sizeof(struct spt_entry));
   lock_acquire(&spt_lock);
   if (entry == NULL) {
-	  lock_release(&spt_lock);
+    lock_release(&spt_lock);
     return false;
   }
   entry->file_info.f = f;
@@ -96,7 +96,7 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
       entry->info = FSYS;
   }
 
-  elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
+  elem = hash_insert(&cur->supp_pt, &entry->elem);
   if (elem == NULL) {
 	  lock_release(&spt_lock);
 	  return true;
@@ -142,9 +142,7 @@ load_file(void *kpage, struct spt_entry *entry)
 		  frame_free(kpage);
 		  return;
 	  }
-	// Should we keep a variable zero in file_info?
 	memset(kpage + page_read_bytes, 0, entry->file_info.zeros);
-	// Not sure if true should always be set.
 	bool success = install_page(entry->vaddr, kpage, entry->file_info.writable);
 
   if (!success) {
@@ -152,41 +150,25 @@ load_file(void *kpage, struct spt_entry *entry)
   }
 }
 
-//TODO: Remove?
-void
-load_mmf(void *page UNUSED, struct spt_entry *entry UNUSED)
-{
-    return; 
-}
-
-// Loads the data into PAGE from its location in SPT_ENTRY
+/* Loads the data into PAGE from its location in SPT_ENTRY */
 void load_into_page (void *page, struct spt_entry *spt_entry)
 {
-  // TODO: Use memcpy from file system, swap slot, or zero the page?
-  // If page data is in swap slot, swap out, into the frame
-  
-  lock_acquire(&spt_lock);
+
+  /* If page data is in swap slot, swap out, into the frame */
   if (spt_entry->info == SWAP) {
-    // printf("SWAP\n");
     load_from_disk(page, spt_entry);
-  // If page data is in file system, load file into frame 
+  /* If page data is in file system, load file into frame */
   } else if (spt_entry->info == FSYS) {
-    // printf("FSYS\n");
     load_file(page, spt_entry);
-
-  // If page data is in memory mapped files, load into frame
-  } else if (spt_entry->info == MMAP) { //TODO: MMAP just seems unnecessary now...
-    // printf("MMAP\n");
+  /* If page data is in memory mapped files, load into frame */
+  } else if (spt_entry->info == MMAP) {
     load_file(page, spt_entry);
-
-  // If page should be all-zero, fill it with zeroes
+  /* If page should be all-zero, fill it with zeroes */
   } else if (spt_entry->info == ALL_ZERO){
-    // printf("ZERO\n");
   	memset(page, 0, PGSIZE);
     install_page(spt_entry->vaddr, page, true);
   }
   spt_entry->in_memory = true;
-  lock_release(&spt_lock);
 }
 
 /* Frees each spt_entry of the hashmap and destroys it. */
@@ -222,9 +204,7 @@ should_stack_grow(void *addr, void *esp)
 void
 grow_stack(void *addr)
 {
-    // printf("Growing stack\n");
     void *page = frame_alloc(PAL_USER, addr);
-    /*I think we need to add it to the page table, but for now I'll just insert it manually.*/
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }
 

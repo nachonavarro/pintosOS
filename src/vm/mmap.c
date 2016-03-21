@@ -4,16 +4,10 @@
 #include "threads/synch.h"
 #include "threads/malloc.h"
 
-//TODO: Don't think we need to flush or reset next_mapid anymore, as each
-//      process has a mmap_table and next_mapid, and flushing and resetting
-//      next_mapid is only necessary when process exits.
-
-// TODO: Define this function?
-// static void free_using_hash_elem(struct hash_elem *, void*);
-
 /* Malloc's space for a struct mmap_mapping and sets all of its members,
    before inserting it into mmap_table. Returns false if not enough
-   space to malloc. */
+   space to malloc. mmap_table_lock acquired before calling and
+   released after. */
 bool
 mmap_table_insert(struct hash *mmap_table, void *start_uaddr, void *end_uaddr,
     int num_pages, mapid_t mapid, struct file *file) {
@@ -46,7 +40,8 @@ mmap_mapping_lookup(struct hash *mmap_table, const mapid_t mapid) {
 }
 
 /* Remove the mapping MMAP from MMAP_TABLE. Should guarantee that MMAP is in
-   MMAP_TABLE before calling this, by calling mmap_mapping_lookup first. */
+   MMAP_TABLE before calling this, by calling mmap_mapping_lookup first.
+   mmap_table_lock acquired before calling and released after. */
 void
 mmap_mapping_delete(struct hash *mmap_table, struct mmap_mapping *mmap) {
   hash_delete(mmap_table, &mmap->hash_elem);
@@ -58,8 +53,6 @@ mmap_mapping_delete(struct hash *mmap_table, struct mmap_mapping *mmap) {
 unsigned
 mapid_hash(const struct hash_elem *mmap_map_, void *aux UNUSED) {
   const struct mmap_mapping *mmap_map = hash_entry(mmap_map_, struct mmap_mapping, hash_elem);
-//  TODO: Not 100% sure which of these hash functions is better.
-//        return (unsigned) hash_int((int) (mmap_map->mapid));
   mapid_t mapid = mmap_map->mapid;
   return hash_bytes(&mapid, sizeof(mapid));
 }

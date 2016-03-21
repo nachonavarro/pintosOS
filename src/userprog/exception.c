@@ -154,63 +154,39 @@ page_fault (struct intr_frame *f)
   {
     /* Exit status set to -1 when exception causes process to exit. */
     cur->exit_status = ERROR;
-//    if (!not_present) {
-//      printf("BECAUSE IT WAS READ ONLY");
-//    } else if (fault_addr == NULL) {
-//      printf("BECAUSE FAULT ADDRESS WAS NULL");
-//    } else {
-//      printf("BECAUSE NOT A USER ADDR");
-//    }
     sys_exit(ERROR);
   }
 
-  // Locate page that faulted in SPT
+  /* Locate page that faulted in SPT */
 
-  // Getting the page address by rounding fault_addr down to nearest page size multiple
+  /* Getting the page address by rounding fault_addr down to nearest page
+     size multiple */
   void *page_addr = pg_round_down(fault_addr);
  
-  // Getting the spt_entry for the page from the supplemental page table
+  /* Getting the spt_entry for the page from the supplemental page table */
   struct spt_entry *entry = get_spt_entry(&cur->supp_pt, page_addr);
 
   /* If page should not expect any data, check if stack should grow.
-   * If not, terminate process and free resources. */
-  //printf("-----------------------------------------\n");
-  //hashtable_debug();
-  //printf("entry->vaddr is: %p \n", entry->vaddr);
+     If not, terminate process and free resources. */
   if (entry == NULL)
   {
     if (should_stack_grow(fault_addr, f->esp)) {
 		  grow_stack(fault_addr);
 	  } else {
 		  cur->exit_status = ERROR;
-		  sys_exit(ERROR);
+      sys_exit(ERROR);
 	  }
   }
 
-  // Obtaining frame to store the page
+  /* Obtaining frame to store the page */
 
   void *kpage = frame_alloc(PAL_USER, page_addr);
 
-  // Fetching the data into the frame
+  /* Fetching the data into the frame */
   if (entry != NULL && !entry->in_memory) {
     entry->frame_addr = kpage;
-	  load_into_page(kpage, entry);
+    load_into_page(kpage, entry);
   }
-
-  // TODO: Delete following lines?
-
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  // printf ("Page fault at %p: %s error %s page in %s context.\n",
-  //         fault_addr,
-  //         not_present ? "not present" : "rights violation",
-  //         write ? "writing" : "reading",
-  //         user ? "user" : "kernel");
-  
-  if (pagedir_get_page(cur->pagedir, page_addr) == NULL)
-    printf("PAGE NOT IN PAGEDIR, AND IT SHOULD BE.");
-
 
 }
 
