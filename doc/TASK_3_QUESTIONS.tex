@@ -97,6 +97,77 @@ Since the 80x86 architecture doesn't provide any way to directly access physical
 
 \subsubsection{Purpose of Frame Table and Swap Table Data Structures}
 
+\begin{enumerate}
+
+\item
+
+\begin{lstlisting}
+struct fte {
+  /* frame and upage are such that install_page(upage, kpage, _) will be
+     called after frame_alloc() is called (kpage is returned from frame_alloc()
+     and upage is passed as an argument, but both are stored in the fte). */
+  void *frame; /* The frame itself, as the frame is 'just a page'. */
+  void *upage; /* Pointer to page that currently occupies this frame. */
+  pid_t owner; /* pid of process that owns this frame. */
+  struct list_elem fte_elem; /* To allow each frame to be added to 'static
+                                  struct list frames' in 'frame.c'. */
+  uint64_t clock_counter;
+};
+\end{lstlisting}
+
+\item
+
+\begin{lstlisting}
+static struct list frame_table;
+static struct lock frame_table_lock;
+\end{lstlisting}
+
+\end{enumerate}
+
+\begin{enumerate}
+
+\item
+
+We made a \texttt{struct fte} to be a frame table entry in the frame table, which is a \texttt{struct list}.
+
+\begin{itemize}
+\item
+
+\texttt{frame} is the kernel virtual address of the frame itself. This address is obtained from the user pool using \texttt{palloc\_get\_page()}.
+
+\item
+
+\texttt{upage} is a pointer to the page that currently occupies the frame that this \texttt{fte} is for. This is passed as an argument when trying to allocate a frame using \texttt{frame\_alloc()}.
+
+\item
+
+\texttt{pid\_t owner} is the process id of the process that owns this frame. This is used in \texttt{save\_frame()} during eviction so that we can access the supplemental page table of that process, and so that we can clear that process' page directory when its frame is evicted.
+
+\item
+
+The \texttt{list\_elem} member allows each \texttt{fte} to be added to the frame table (a \texttt{struct list}). 
+
+\item
+
+\texttt{clock\_counter} is used in the second chance eviction algorithm, so we can order the frame table entries based on the \texttt{clock\_counter}.
+
+\end{itemize}
+
+\item
+
+\begin{itemize}
+\item
+
+\texttt{frame\_table} is a global \texttt{struct list} of \texttt{struct fte}'s. It's main function is to obtain an unused frame. It is global since each process needs to obtain a frame from the same physical memory.
+
+\item
+
+\texttt{frame\_table\_lock} is required when modifying \texttt{frame\_table} (insertion and deletion), since \texttt{frame\_table} can be accessed by multiple processes.
+
+\end{itemize}
+
+\end{enumerate}
+
 \subsection{Algorithms}
 
 \subsubsection{Choosing a Frame to Evict}
