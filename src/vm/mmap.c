@@ -27,9 +27,7 @@ mmap_table_insert(struct hash *mmap_table, void *start_uaddr, void *end_uaddr,
   mmap->num_pages = num_pages;
   mmap->mapid = mapid;
   mmap->file = file;
-//  lock_acquire(&mmap_table_lock);
   hash_insert(mmap_table, &mmap->hash_elem);
-//  lock_release(&mmap_table_lock);
   return true;
 }
 

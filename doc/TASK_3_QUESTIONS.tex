@@ -180,6 +180,8 @@ The \texttt{list\_elem} member allows each \texttt{fte} to be added to the frame
 
 \subsubsection{Basics of VM Synchronisation Design}
 
+For the Virtual Memory task, our synchronisation design was to use a lock for each table that was made - the frame table, swap table, memory map table, and supplemental page table. Each of these locks is acquired before modifying the respective table, and is released after modification has completed. This means that the Virtual Memory synchronisation design is consistent across the whole task, since locks are the only synchronisation primitive used here, and makes it very easy to understand. This design prevents deadlock because no process will try to acquire more than one Virtual Memory lock at a time. This means that there will be no circular waits, where each process in a circular chain is waiting on a lock that the next process in the chain has. Since this is one of the four necessary conditions for deadlock, deadlock is prevented.
+
 \subsubsection{Page Fault Causing Eviction}
 
 \subsubsection{Handling Access to Paged-Out Pages During System Calls}
@@ -187,6 +189,8 @@ The \texttt{list\_elem} member allows each \texttt{fte} to be added to the frame
 \subsection{Rationale}
 
 \subsubsection{Number of Locks}
+
+Our VM synchronisation design consists of a medium amount of locks - four. We chose this many locks because we felt it was more logical to have a lock for each data structure that was made for this task, to make our code consistent and easier to understand. Also, we felt that this number of locks was the smallest amount of locks we could use to get rid of race conditions, yet there are not so many locks that parallelism is too limited. We needed at least this many locks so that when modifying the four VM data structures, we could ensure that race conditions were prevented.
 
 \section{Memory Mapped Files}
 
@@ -276,6 +280,8 @@ The first member is \texttt{mmap\_table} - the actual hash table for the memory 
 \subsection{Algorithms}
 
 \subsubsection{Integrating Memory Mapped Files into Virtual Memory Subsystem}
+
+
 
 \subsubsection{Overlapping File Mapping}
 
