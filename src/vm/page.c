@@ -46,7 +46,6 @@ compare_less_hash (const struct hash_elem *a,
 bool
 spt_insert_all_zero(void *uaddr)
 {
-
   struct thread *cur = thread_current();
   struct hash_elem *elem;
   struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREE.
@@ -56,6 +55,8 @@ spt_insert_all_zero(void *uaddr)
   }
   entry->info = ALL_ZERO;
   entry->vaddr = uaddr;
+  entry->in_memory = false;
+  entry->file_info.writable = true;
   elem = hash_insert(&cur->supp_pt, &entry->elem); //Should check null?
   if (elem == NULL) {
 	  lock_release(&spt_lock);
@@ -77,7 +78,8 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   struct spt_entry *entry = malloc(sizeof(struct spt_entry)); // WE NEED TO FREEEE.
   lock_acquire(&spt_lock);
   if (entry == NULL) {
-	  return false;
+	  lock_release(&spt_lock);
+    return false;
   }
   entry->file_info.f = f;
   entry->file_info.offset = offset;
@@ -86,6 +88,7 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
   entry->file_info.writable = writable;
   entry->file_info.executable = executable;
   entry->vaddr = uaddr;
+  entry->in_memory = false;
 
   if (mmap) {
       entry->info = MMAP;
@@ -107,17 +110,19 @@ spt_insert_file(void *uaddr, struct file *f, size_t size, size_t zeros, size_t o
 struct spt_entry*
 get_spt_entry(struct hash *table, void *address)
 {
+  lock_acquire(&spt_lock);
 	struct spt_entry entry;
 	entry.vaddr = address;
 	struct hash_elem *elem = hash_find(table, &entry.elem);
-  
+  lock_release(&spt_lock);
 	return (elem != NULL) ? hash_entry(elem, struct spt_entry, elem) : NULL;
 }
 
 void
 load_from_disk(void *page, struct spt_entry *spt_entry)
 {
-	swap_out(page, spt_entry->swap_slot);
+    
+  	swap_out(page, spt_entry->swap_slot);
     bool success = install_page(spt_entry->vaddr, page, spt_entry->file_info.writable);
     if (!success) {
         frame_free(page);
@@ -160,6 +165,7 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
   // TODO: Use memcpy from file system, swap slot, or zero the page?
   // If page data is in swap slot, swap out, into the frame
   
+  lock_acquire(&spt_lock);
   if (spt_entry->info == SWAP) {
     // printf("SWAP\n");
     load_from_disk(page, spt_entry);
@@ -179,6 +185,8 @@ void load_into_page (void *page, struct spt_entry *spt_entry)
   	memset(page, 0, PGSIZE);
     install_page(spt_entry->vaddr, page, true);
   }
+  spt_entry->in_memory = true;
+  lock_release(&spt_lock);
 }
 
 /* Frees each spt_entry of the hashmap and destroys it. */
@@ -226,11 +234,12 @@ void hashtable_debug(void)
 
   struct hash_iterator i;
   hash_first (&i, supplemental_page_table);
-
+  int count = 0;
   while (hash_next (&i))
   {
+    count++;
     struct spt_entry *entry = hash_entry(hash_cur (&i), struct spt_entry, elem);
-
+  
     char *type = NULL;
     enum page_info status = entry->info;
     if (status == FSYS)
@@ -242,6 +251,6 @@ void hashtable_debug(void)
     if (status == SWAP)
       type = "swap";
 
-    printf ("frame: %p User virtual addr: %p type: %s\n", entry->frame_addr, entry->vaddr, type);
+    printf ("%d. frame: %p User virtual addr: %p type: %s\n", count, entry->frame_addr, entry->vaddr, type);
   }
 }

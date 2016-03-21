@@ -14,6 +14,9 @@ void
 swap_init(void)
 {
     swap_space = block_get_role(BLOCK_SWAP);
+    if (swap_space == NULL) {
+      PANIC("Couldn't initialize swap space.");
+    }
     pages_in_swap_space = block_size(swap_space) / SECTORS_PER_PAGE;
     swap_bitmap = bitmap_create(pages_in_swap_space);
     lock_init(&swap_lock);
@@ -57,7 +60,6 @@ swap_out(void *buf, size_t swap_slot)
                 SECTORS_PER_PAGE * swap_slot + i, 
                   buf + i * BLOCK_SECTOR_SIZE);
         }
-    free(swap_slot);
 }
 
 
