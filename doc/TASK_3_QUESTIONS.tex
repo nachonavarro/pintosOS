@@ -281,7 +281,7 @@ The first member is \texttt{mmap\_table} - the actual hash table for the memory 
 
 \subsubsection{Integrating Memory Mapped Files into Virtual Memory Subsystem}
 
-
+Memory mapped files integrate quite seamlessly into our virtual memory subsystem. On a call to \texttt{sys\_mmap()}, each page of the memory mapped file will be inserted into the supplementary page table using \texttt{spt\_insert\_file()}, just as if it was a normal file that wasn't memory mapped. This means that the memory mapped file is ready to be lazily loaded just like any other entries in the supplementary page table.
 
 \subsubsection{Overlapping File Mapping}
 
@@ -290,5 +290,7 @@ In \texttt{sys\_mmap()}, the number of pages that the file will have to be mappe
 \subsection{Rationale}
 
 \subsubsection{Sharing Code Between \texttt{mmap} and Data Demand-Paging from Executables}
+
+When inserting into the supplemental page table, both memory mappings and files get inserted using \texttt{spt\_insert\_file()}, which means that they both ready to be lazily loaded, and any further code for the lazy loading will be the same for both memory maps and files. The only code that is different is that \texttt{mmap} comes from the \texttt{mmap} system call, where we also have to check to see if the \texttt{mmap} is valid, insert into the \texttt{mmap\_table}, and set a unique \texttt{mapid}. Also, memory mappings can be unmapped using the \texttt{munmap} system call, which causes the mappings to potentially be written back to their files, so this code isn't shared. The only extra bit of code that could have been shared is the code that actually loops through each page and calls \texttt{spt\_insert\_file()} on each page. This code isn't shared because, although most of it is very similar, in \texttt{sys\_mmap()} we also need to check to see if we are overlapping with any existing pages in the supplementary page table. It makes a lot of sense to share the rest of the code, as code duplication is usually s bad thing, and in this case the code is still very easy to understand.
 
 \end{document}
