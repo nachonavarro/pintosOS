@@ -121,8 +121,8 @@ static void
 page_fault (struct intr_frame *f) 
 {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
-  // bool write;        /* True: access was write, false: access was read. 
-  // bool user;         /* True: access by user, false: access by kernel. */
+  bool write;        /* True: access was write, false: access was read. */
+  bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
   /* Obtain faulting address, the virtual address that was
@@ -140,9 +140,8 @@ page_fault (struct intr_frame *f)
 
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
-  // TODO: Use this information?
-  // write = (f->error_code & PF_W) != 0;
-  // user = (f->error_code & PF_U) != 0;
+  write = (f->error_code & PF_W) != 0;
+  user = (f->error_code & PF_U) != 0;
 
   /* Count page faults. */
   page_fault_cnt++;
@@ -155,6 +154,13 @@ page_fault (struct intr_frame *f)
   {
     /* Exit status set to -1 when exception causes process to exit. */
     cur->exit_status = ERROR;
+//    if (!not_present) {
+//      printf("BECAUSE IT WAS READ ONLY");
+//    } else if (fault_addr == NULL) {
+//      printf("BECAUSE FAULT ADDRESS WAS NULL");
+//    } else {
+//      printf("BECAUSE NOT A USER ADDR");
+//    }
     sys_exit(ERROR);
   }
 
@@ -186,7 +192,7 @@ page_fault (struct intr_frame *f)
   void *kpage = frame_alloc(PAL_USER, page_addr);
 
   // Fetching the data into the frame
-  if (entry != NULL) {
+  if (entry != NULL && !entry->in_memory) {
     entry->frame_addr = kpage;
 	  load_into_page(kpage, entry);
   }
@@ -201,7 +207,11 @@ page_fault (struct intr_frame *f)
   //         not_present ? "not present" : "rights violation",
   //         write ? "writing" : "reading",
   //         user ? "user" : "kernel");
-  //kill (f);
+  
+  if (pagedir_get_page(cur->pagedir, page_addr) == NULL)
+    printf("PAGE NOT IN PAGEDIR, AND IT SHOULD BE.");
+
+
 }
 
 

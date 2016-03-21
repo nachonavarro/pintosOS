@@ -9,6 +9,7 @@
 
 static struct list frame_table;
 static struct lock frame_table_lock;
+static struct lock evict_lock;
 
 static bool add_frame(void *frame, void *upage);
 static void remove_frame(void *frame);
@@ -21,6 +22,8 @@ void
 frame_table_init(void) {
   list_init(&frame_table);
   lock_init(&frame_table_lock);
+  lock_init(&evict_lock);
+
 }
 
 /* Called instead of palloc_get_page() when allocating a user page.
@@ -134,38 +137,41 @@ less_recent (const struct list_elem *a,
    NULL on failure. */
 void *
 evict(void *upage) {
-  struct fte *frame_entry = choose_frame_to_evict_snd_chance();
+  lock_acquire(&evict_lock);
+  struct fte *frame_entry = choose_frame_to_evict_random();
+  void *frame_to_evict = frame_entry->frame;
   save_frame(frame_entry, upage);
-  ASSERT(frame_entry->frame != NULL);
-  return frame_entry->frame;
+  lock_release(&evict_lock);
+  return frame_to_evict;
 }
 
 
 void
 save_frame(struct fte *frame, void *upage)
 {
+  frame->owner = thread_current()->tid;
   struct thread *t = tid_to_thread((tid_t) frame->owner);
   ASSERT(t != NULL);
   struct spt_entry *entry = get_spt_entry(&t->supp_pt, frame->upage);
-  entry->vaddr = upage;
-  frame->upage = upage;
-  entry->frame_addr = frame->frame;
-  ASSERT(entry != NULL);
-  ASSERT(frame->upage == entry->vaddr);
+  
   bool dirty = pagedir_is_dirty(t->pagedir, entry->vaddr);
+  
+  /* If executable, store it in SWAP space.*/
   if (entry->file_info.executable && entry->info == FSYS) {
       entry->info = SWAP;
   }
+  
   if (entry->info == SWAP || entry->info == ALL_ZERO) {
       size_t swap_slot = swap_in(entry->frame_addr);
       entry->swap_slot = swap_slot;
-      entry->frame_addr = frame->frame;
+      entry->info = SWAP;
   } else if (entry->info == FSYS || entry->info == MMAP) {
       file_write_at(entry->file_info.f, entry->frame_addr, entry->file_info.size, entry->file_info.offset);
   }
-  ASSERT(frame->upage == entry->vaddr);
+  entry->in_memory = false;
   pagedir_clear_page(t->pagedir, frame->upage);
-
+  entry->frame_addr = NULL;
+  frame->upage = upage;
 }
 
 
