@@ -170,6 +170,12 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+#ifdef VM
+  if (timer_ticks() % TIME_SLICE == 0) {
+    update_frame_clock_counters();
+  }
+#endif
+
   /* Next if statement deals with updating BSD Scheduler specific data, such as
      recent_cpu. */
   if (thread_mlfqs) {
