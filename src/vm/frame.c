@@ -242,3 +242,23 @@ debug_frame(void) {
     }
     printf("-----------------------------------\n\n");
 }
+
+void 
+update_frame_clock_counters(void) 
+{
+  // Skeleton for second chance algorithm
+  // Commented as it we have a problem with a frame's "owner" thread.
+
+  // struct list_elem *e;
+  // for (e = list_begin(&frame_table); e != list_end(&frame_table) ; e = list_next(e)) 
+  // {
+  //   struct fte *fte_entry = list_entry(e, struct fte, fte_elem);
+  //   int tid = (tid_t) fte_entry->owner;
+  //   struct thread *t = tid_to_thread(tid);
+
+  //   if (pagedir_is_accessed(t->pagedir, fte_entry->upage)) {
+  //     pagedir_set_accessed(t->pagedir, fte_entry->upage, false);
+  //     fte_entry->clock_counter = timer_ticks();
+  //   }
+  // }
+}

@@ -4,6 +4,7 @@
 #include "userprog/process.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
+#include "devices/timer.h"
 
 struct fte {
   /* frame and upage are such that install_page(upage, kpage, _) will be
@@ -25,6 +26,7 @@ struct fte *choose_frame_to_evict_random(void);
 struct fte *choose_frame_to_evict_snd_chance(void);
 void save_frame(struct fte *, void*);
 void *evict(void *upage);
+void update_frame_clock_counters(void);
 
 #endif /* vm/frame.h */
 
