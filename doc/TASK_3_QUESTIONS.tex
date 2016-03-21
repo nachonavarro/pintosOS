@@ -77,6 +77,8 @@
 
 \subsubsection{Locating Frame for Given Page}
 
+Each process' supplemental page table is a hash table mapping between page addresses and their corresponding \texttt{struct spt\_entry}. The \texttt{struct spt\_entry} contains the address of the frame that contains the data for that page. For a given page, \texttt{get\_spt\_entry()} is called with the address of the page as an argument, and a pointer to the appropriate process' supplemental page table as the other argument. \texttt{get\_spt\_entry()} will return the \texttt{struct spt\_entry} for the given page, or return \texttt{NULL} if there is no \texttt{struct spt\_entry} in the table for that page. \texttt{get\_spt\_entry()} will simply call \texttt{hash\_find()} to find the \texttt{hash\_elem*} for the \texttt{struct spt\_entry} in the supplemental page table. The second argument to \texttt{hash\_find} is a \texttt{struct spt\_entry} that is allocated as a local variable, with it's \texttt{vaddr} member, which is the address of the page that this \texttt{struct spt\_entry} corresponds to, set to the address of the given page. It is ok to allocate this \texttt{struct} as a local variable because it is a fairly small data structure. A lock is not required here because \texttt{hash\_find()} only examines the hash table, and doesn't modify it. If \texttt{hash\_find()} returned \texttt{NULL}, \texttt{get\_spt\_entry()} will return \texttt{NULL} since there is no entry in the supplemental page table for the given page. Otherwise, we simply return the \texttt{struct spt\_entry} for the \texttt{hash\_elem*} using the \texttt{hash\_entry} macro. Now, to access the address of the frame containing the data of the given page, we can just read the \texttt{frame\_addr} member of the returned \texttt{struct spt\_entry}, after checking that the return value of \texttt{get\_spt\_entry()} wasn't \texttt{NULL}.
+
 \subsubsection{Coordinating Accessed and Dirty Bits}
 
 \subsection{Synchronisation}
@@ -87,11 +89,84 @@
 
 \subsubsection{Virtual-to-Physical Mappings}
 
+Since the 80x86 architecture doesn't provide any way to directly access physical memory, Pintos maps kernel virtual memory directly to physical memory, which means that frames can be accessed through kernel virtual memory. We did not change this mapping because it was working perfectly well as it was. To map between a frame (physical address/kernel virtual address) and the user page contained within that frame, a frame table is used. Each entry in this frame table, a \texttt{struct fte}, contains the frame address and user page address, as well as the \texttt{pid} of its owner and a \texttt{struct list\_elem} so that it can be added to the frame table, which is a list. However, although this can be used as this could be used as the primary mapping between physical and virtual memory, we chose to use the supplemental page table as the main mapping for this, which leaves the frame table's main purpose being to obtain an unused frame - either by \texttt{palloc\_get\_page()}, or by eviction when the frame table is full. It seems like a better idea to use the supplemental page table for this mapping because the supplemental page table already holds lots of information about each page, so it made sense just to add a \texttt{frame\_addr} member to each supplemental page table entry, as it can be accessed the same way as the other pieces of information about that page in the supplemental page table. We chose to implement the supplemental page table as a hash table because, given the address of the page, hash tables allow for very efficient insertion and deletion over a wide range of table sizes. A hash table also made sense because each page has lots of information relating to it, so we can just map the page virtual address to a \texttt{struct} containing all information, and then grab whatever information we need.
+
 \section{Paging To and From Disk}
 
 \subsection{Data Structures}
 
 \subsubsection{Purpose of Frame Table and Swap Table Data Structures}
+
+\begin{enumerate}
+
+\item
+
+\begin{lstlisting}
+struct fte {
+  /* frame and upage are such that install_page(upage, kpage, _) will be
+     called after frame_alloc() is called (kpage is returned from frame_alloc()
+     and upage is passed as an argument, but both are stored in the fte). */
+  void *frame; /* The frame itself, as the frame is 'just a page'. */
+  void *upage; /* Pointer to page that currently occupies this frame. */
+  pid_t owner; /* pid of process that owns this frame. */
+  struct list_elem fte_elem; /* To allow each frame to be added to 'static
+                                  struct list frames' in 'frame.c'. */
+  uint64_t clock_counter;
+};
+\end{lstlisting}
+
+\item
+
+\begin{lstlisting}
+static struct list frame_table;
+static struct lock frame_table_lock;
+\end{lstlisting}
+
+\end{enumerate}
+
+\begin{enumerate}
+
+\item
+
+We made a \texttt{struct fte} to be a frame table entry in the frame table, which is a \texttt{struct list}.
+
+\begin{itemize}
+\item
+
+\texttt{frame} is the kernel virtual address of the frame itself. This address is obtained from the user pool using \texttt{palloc\_get\_page()}.
+
+\item
+
+\texttt{upage} is a pointer to the page that currently occupies the frame that this \texttt{fte} is for. This is passed as an argument when trying to allocate a frame using \texttt{frame\_alloc()}.
+
+\item
+
+\texttt{pid\_t owner} is the process id of the process that owns this frame. This is used in \texttt{save\_frame()} during eviction so that we can access the supplemental page table of that process, and so that we can clear that process' page directory when its frame is evicted.
+
+\item
+
+The \texttt{list\_elem} member allows each \texttt{fte} to be added to the frame table (a \texttt{struct list}). 
+
+\item
+
+\texttt{clock\_counter} is used in the second chance eviction algorithm, so we can order the frame table entries based on the \texttt{clock\_counter}.
+
+\end{itemize}
+
+\item
+
+\begin{itemize}
+\item
+
+\texttt{frame\_table} is a global \texttt{struct list} of \texttt{struct fte}'s. It's main function is to obtain an unused frame. It is global since each process needs to obtain a frame from the same physical memory.
+
+\item
+
+\texttt{frame\_table\_lock} is required when modifying \texttt{frame\_table} (insertion and deletion), since \texttt{frame\_table} can be accessed by multiple processes.
+
+\end{itemize}
+
+\end{enumerate}
 
 \subsection{Algorithms}
 
@@ -105,6 +180,8 @@
 
 \subsubsection{Basics of VM Synchronisation Design}
 
+For the Virtual Memory task, our synchronisation design was to use a lock for each table that was made - the frame table, swap table, memory map table, and supplemental page table. Each of these locks is acquired before modifying the respective table, and is released after modification has completed. This means that the Virtual Memory synchronisation design is consistent across the whole task, since locks are the only synchronisation primitive used here, and makes it very easy to understand. This design prevents deadlock because no process will try to acquire more than one Virtual Memory lock at a time. This means that there will be no circular waits, where each process in a circular chain is waiting on a lock that the next process in the chain has. Since this is one of the four necessary conditions for deadlock, deadlock is prevented.
+
 \subsubsection{Page Fault Causing Eviction}
 
 \subsubsection{Handling Access to Paged-Out Pages During System Calls}
@@ -112,6 +189,8 @@
 \subsection{Rationale}
 
 \subsubsection{Number of Locks}
+
+Our VM synchronisation design consists of a medium amount of locks - four. We chose this many locks because we felt it was more logical to have a lock for each data structure that was made for this task, to make our code consistent and easier to understand. Also, we felt that this number of locks was the smallest amount of locks we could use to get rid of race conditions, yet there are not so many locks that parallelism is too limited. We needed at least this many locks so that when modifying the four VM data structures, we could ensure that race conditions were prevented.
 
 \section{Memory Mapped Files}
 
@@ -202,9 +281,11 @@ The first member is \texttt{mmap\_table} - the actual hash table for the memory 
 
 \subsubsection{Integrating Memory Mapped Files into Virtual Memory Subsystem}
 
+
+
 \subsubsection{Overlapping File Mapping}
 
-In \texttt{sys\_mmap()}, the number of pages that the file will have to be mapped to is calculated by doing \texttt{int pages = size / PGSIZE}, where \texttt{size} is the size in bytes of the file. However, since this is integer division, if \texttt{size} is not a multiple of \texttt{PGSIZE}, the final page won't be counted in \texttt{pages}. To fix this, we check to see if \texttt{size} is a multiple of \texttt{PGSIZE} using \texttt{size \% PGSIZE}. If this equals 0, then we can increment \texttt{pages} so that it is now correct. We then use a for loop, \texttt{for (i = 0; i < pages; i++)}, to check that no page in the file mapping overlaps with any existing segment. In this for loop, we use \texttt{get\_spt\_entry()} to check if this thread's supplementary page table has an entry for this page, which will be \texttt{((uint8\_t *) addr) + (i * PGSIZE))}, where \texttt{addr} is the address of the first page to be mapped to (this is the second argument to the \texttt{mmap} system call. If this function returns \texttt{NULL}, then there is an overlap, and we can return -1 from \texttt{sys\_mmap()}.
+In \texttt{sys\_mmap()}, the number of pages that the file will have to be mapped to is calculated by doing \texttt{int pages = size / PGSIZE}, where \texttt{size} is the size in bytes of the file. However, since this is integer division, if \texttt{size} is not a multiple of \texttt{PGSIZE}, the final page won't be counted in \texttt{pages}. To fix this, we check to see if \texttt{size} is a multiple of \texttt{PGSIZE} using \texttt{size \% PGSIZE}. If this equals 0, then we can increment \texttt{pages} so that it is now correct. We then use a for loop, \texttt{for (i = 0; i < pages; i++)}, to check that no page in the file mapping overlaps with any existing segment. In this for loop, we use \texttt{get\_spt\_entry()} to check if this thread's supplementary page table has an entry for this page, which will be \texttt{((uint8\_t *) addr) + (i * PGSIZE))}, where \texttt{addr} is the address of the first page to be mapped to (this is the second argument to the \texttt{mmap} system call. If this function doesn't return \texttt{NULL}, then there is an overlap, and we can return -1 from \texttt{sys\_mmap()}.
 
 \subsection{Rationale}
 

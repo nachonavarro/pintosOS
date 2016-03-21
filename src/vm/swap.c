@@ -46,8 +46,6 @@ swap_in(void *buf)
     return free_slot_index;
 }
 
-
-//TODO: Billy, the frame table will need to supply the slot it needs from disk.
 void
 swap_out(void *buf, size_t swap_slot)
 {
