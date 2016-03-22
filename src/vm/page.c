@@ -207,30 +207,3 @@ grow_stack(void *addr)
     void *page = frame_alloc(PAL_USER, addr);
     pagedir_set_page(thread_current()->pagedir, pg_round_down(addr), page, true);
 }
-
-void hashtable_debug(void)
-{
-  struct hash *supplemental_page_table = &thread_current()->supp_pt;
-
-  struct hash_iterator i;
-  hash_first (&i, supplemental_page_table);
-  int count = 0;
-  while (hash_next (&i))
-  {
-    count++;
-    struct spt_entry *entry = hash_entry(hash_cur (&i), struct spt_entry, elem);
-  
-    char *type = NULL;
-    enum page_info status = entry->info;
-    if (status == FSYS)
-      type = "filesys";
-    if (status == MMAP)
-      type = "memory-mapped";
-    if (status == ALL_ZERO)
-      type = "zero";
-    if (status == SWAP)
-      type = "swap";
-
-    printf ("%d. frame: %p User virtual addr: %p type: %s\n", count, entry->frame_addr, entry->vaddr, type);
-  }
-}

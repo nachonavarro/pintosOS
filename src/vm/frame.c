@@ -12,7 +12,6 @@ static struct lock frame_table_lock;
 
 static void add_frame(void *frame, void *upage);
 static void remove_frame(void *frame);
-void debug_frame(void);
 static bool less_recent (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Initialise the actual frame table itself, along with any locks required in
@@ -230,24 +229,11 @@ remove_frame(void *frame) {
   lock_release(&frame_table_lock);
 }
 
-void
-debug_frame(void) {
-    struct list_elem *e;
-    int count = 0;
-    printf("-----------------------------------\n\n");
-    for (e = list_begin (&frame_table); e != list_end (&frame_table); e = list_next (e)) {
-        count++;
-        struct fte *fte = list_entry(e, struct fte, fte_elem);
-        printf("%d: frame is: %p, vaddr is: %p, thread owner is: %d.\n", count, fte->frame, fte->upage, fte->owner);
-    }
-    printf("-----------------------------------\n\n");
-}
-
 void 
 update_frame_clock_counters(void) 
 {
   // Skeleton for second chance algorithm
-  // Commented as it we have a problem with a frame's "owner" thread.
+  // Commented as we have a problem to access frame's "owner" thread.
 
   // struct list_elem *e;
   // for (e = list_begin(&frame_table); e != list_end(&frame_table) ; e = list_next(e)) 

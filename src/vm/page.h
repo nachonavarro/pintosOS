@@ -49,6 +49,5 @@ bool install_page(void *upage, void *kpage, bool writable);
 
 bool should_stack_grow(void *uaddr, void *esp);
 void grow_stack(void *addr);
-void hashtable_debug(void);
 
 #endif /* vm/page.h */
